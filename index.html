@@ -256,6 +256,11 @@
   .obj-btn:hover { background:var(--surface2); color:var(--text); }
   .obj-btn.del:hover { color:var(--c2); }
 
+  .obj-day-tabs { display:flex; gap:4px; background:var(--bg); padding:3px; border-radius:8px; }
+  .obj-day-tab { padding:5px 12px; border-radius:6px; border:none; background:transparent; color:var(--muted); font-size:12px; font-family:var(--sans); cursor:pointer; transition:all 0.2s; }
+  .obj-day-tab.active { background:var(--surface2); color:var(--text); }
+  .obj-day-tab.tomorrow-active { background:rgba(255,209,102,0.15); color:var(--c3); }
+
   .obj-new-row { display:flex; align-items:center; gap:8px; margin-top:12px; padding-top:12px; border-top:1px dashed var(--border); }
   .obj-new-input { flex:1; background:transparent; border:none; color:var(--text); font-family:var(--sans); font-size:14px; outline:none; }
   .obj-new-input::placeholder { color:var(--muted); }
@@ -314,8 +319,12 @@
   <div class="card obj-hero" id="objectives-section" style="margin-bottom:16px">
     <div class="obj-top">
       <div>
-        <div class="card-title" style="margin-bottom:3px">🎯 Objectifs du jour</div>
-        <div class="obj-summary" id="obj-summary">Aucun objectif pour aujourd'hui</div>
+        <div class="card-title" style="margin-bottom:3px">🎯 Objectifs</div>
+        <div class="obj-summary" id="obj-summary">Aucun objectif</div>
+      </div>
+      <div class="obj-day-tabs">
+        <button class="obj-day-tab active" id="obj-tab-today" onclick="switchObjDay('today')">Aujourd'hui</button>
+        <button class="obj-day-tab" id="obj-tab-tomorrow" onclick="switchObjDay('tomorrow')">Demain</button>
       </div>
     </div>
     <div class="obj-global-wrap" id="obj-global-wrap" style="display:none">
@@ -531,6 +540,7 @@ const GYM_PROGRAM = [
 let habitsCache = null
 let gymState = {}
 let currentDate = new Date()
+let objViewDay = 'today' // 'today' | 'tomorrow'
 
 // ─── UTILS ───────────────────────────────────────────────────────────────────
 function getDateKey(d) {
@@ -1183,13 +1193,29 @@ function updateDayBar(di) {
 }
 
 // ─── OBJECTIVES ──────────────────────────────────────────────────────────────
+function getObjDate() {
+  const d = new Date(currentDate)
+  if (objViewDay === 'tomorrow') d.setDate(d.getDate() + 1)
+  return getDateKey(d)
+}
+
+function switchObjDay(day) {
+  objViewDay = day
+  const tabToday    = document.getElementById('obj-tab-today')
+  const tabTomorrow = document.getElementById('obj-tab-tomorrow')
+  tabToday.className    = 'obj-day-tab' + (day === 'today'    ? ' active' : '')
+  tabTomorrow.className = 'obj-day-tab' + (day === 'tomorrow' ? ' tomorrow-active' : '')
+  document.getElementById('obj-new-input').placeholder =
+    day === 'tomorrow' ? 'Objectif pour demain...' : 'Ajouter un objectif...'
+  renderObjectives()
+}
 async function getObjectives(date) {
   const { data } = await sb.from('daily_objectives').select('*').eq('date', date).order('sort_order')
   return data || []
 }
 
 async function renderObjectives() {
-  const date = getDateKey(currentDate)
+  const date = getObjDate()
   const objectives = await getObjectives(date)
   const list = document.getElementById('obj-list')
   list.innerHTML = ''
@@ -1226,19 +1252,21 @@ async function renderObjectives() {
   wrap.style.display = total ? 'flex' : 'none'
   document.getElementById('obj-global-fill').style.width = pct + '%'
   document.getElementById('obj-global-pct').textContent  = pct + '%'
+  const isTomorrow = objViewDay === 'tomorrow'
   document.getElementById('obj-summary').textContent =
-    total === 0 ? 'Aucun objectif pour aujourd\'hui'
-    : `${done}/${total} complété${done > 1 ? 's' : ''}`
+    total === 0
+      ? (isTomorrow ? 'Aucun objectif prévu pour demain' : 'Aucun objectif pour aujourd\'hui')
+      : (isTomorrow ? `${total} objectif${total > 1 ? 's' : ''} prévu${total > 1 ? 's' : ''} demain` : `${done}/${total} complété${done > 1 ? 's' : ''}`)
 
-  // Auto-check goals habit
-  await syncGoalsHabit(date, objectives)
+  // Auto-check goals habit (today only)
+  if (!isTomorrow) await syncGoalsHabit(date, objectives)
 }
 
 async function addObjective() {
   const input = document.getElementById('obj-new-input')
   const text = input.value.trim()
   if (!text) return
-  const date = getDateKey(currentDate)
+  const date = getObjDate()
   const existing = await getObjectives(date)
   await sb.from('daily_objectives').insert({ date, text, done: false, note: null, sort_order: existing.length })
   input.value = ''
