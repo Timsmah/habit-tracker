@@ -100,8 +100,7 @@
     height: 14px; background: rgba(255,255,255,0.12); border-radius: 50%;
   }
   .steps-text-layer { position: relative; z-index: 2; text-align: center; line-height: 1; }
-  .steps-goal-label { font-size: 9px; color: rgba(255,255,255,0.55); font-family: var(--mono); letter-spacing: 0.5px; margin-bottom: 2px; }
-  .steps-foot { font-size: 13px; margin-bottom: 2px; }
+.steps-foot { font-size: 13px; margin-bottom: 2px; }
   .steps-number { font-family: var(--mono); font-size: 22px; font-weight: 700; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.4); }
   .steps-sub-label { font-size: 9px; color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: 1px; margin-top: 3px; font-family: var(--mono); }
 
@@ -221,9 +220,9 @@
   .ex-progress-track { flex: 1; height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; }
   .ex-progress-fill { height: 100%; border-radius: 3px; transition: width 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
   .ex-progress-label { font-family: var(--mono); font-size: 11px; color: var(--muted); flex-shrink: 0; width: 28px; text-align: right; }
-  .ex-weight-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-  .weight-input { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; color: var(--text); font-family: var(--mono); font-size: 12px; width: 72px; text-align: center; outline: none; transition: border-color 0.2s; }
-  .weight-input:focus { border-color: var(--c4); }
+  .mood-note { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); font-family: var(--sans); font-size: 13px; width: 100%; resize: none; outline: none; transition: border-color 0.2s; margin-top: 10px; min-height: 64px; }
+  .mood-note:focus { border-color: var(--c1); }
+  .mood-note::placeholder { color: var(--muted); }
   .gym-day-total-bar { height: 3px; background: var(--bg); border-radius: 0 0 var(--radius) var(--radius); overflow: hidden; }
   .gym-day-total-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
 
@@ -262,7 +261,11 @@
 
 <!-- DASHBOARD -->
 <div class="page active" id="page-dashboard">
-  <p class="section-title">Aujourd'hui</p>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;margin-top:0;padding-bottom:8px;border-bottom:1px solid var(--border)">
+    <button onclick="navigateDay(-1)" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--muted);padding:6px 14px;cursor:pointer;font-size:13px;transition:all 0.2s" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">← Hier</button>
+    <span id="dash-date-label" style="font-family:var(--mono);font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--muted)">Aujourd'hui</span>
+    <button id="btn-next-day" onclick="navigateDay(1)" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--muted);padding:6px 14px;cursor:pointer;font-size:13px;transition:all 0.2s;visibility:hidden" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">Demain →</button>
+  </div>
 
   <div class="grid-4" style="margin-bottom:16px">
     <div class="stat-card green">
@@ -274,7 +277,6 @@
       <div class="steps-circle-bg">
         <div class="steps-fill-layer" id="steps-fill" style="height:0%"></div>
         <div class="steps-text-layer">
-          <div class="steps-goal-label" id="steps-goal-label">Goal : 10 000</div>
           <div class="steps-foot">👣</div>
           <div class="steps-number" id="dash-steps">—</div>
           <div class="steps-sub-label">Steps</div>
@@ -319,6 +321,7 @@
           <div class="humeur-btn" onclick="selectMood(this,'🙂')">🙂</div>
           <div class="humeur-btn" onclick="selectMood(this,'🔥')">🔥</div>
         </div>
+        <textarea class="mood-note" id="input-note" placeholder="Note du jour... comment tu te sens, ce qui s'est passé"></textarea>
       </div>
       <button class="btn-save" onclick="saveStats()">Sauvegarder</button>
     </div>
@@ -448,7 +451,8 @@ const GYM_PROGRAM = [
 
 // ─── STATE ───────────────────────────────────────────────────────────────────
 let habitsCache = null
-let gymState = {}  // { dayIndex: { exIndex: { sets, weight } } }
+let gymState = {}
+let currentDate = new Date()
 
 // ─── UTILS ───────────────────────────────────────────────────────────────────
 function getDateKey(d) {
@@ -540,7 +544,22 @@ async function saveGymLogDB(di, ei) {
 
 // ─── DASHBOARD ───────────────────────────────────────────────────────────────
 async function renderDashboard() {
-  const date = getDateKey()
+  const date = getDateKey(currentDate)
+  const today = getDateKey(new Date())
+  const isToday = date === today
+
+  // Update date label
+  const days = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi']
+  const months = ['jan','fév','mar','avr','mai','jun','jul','aoû','sep','oct','nov','déc']
+  const label = isToday
+    ? "Aujourd'hui"
+    : `${days[currentDate.getDay()]} ${currentDate.getDate()} ${months[currentDate.getMonth()]}`
+  document.getElementById('dash-date-label').textContent = label
+
+  // Show/hide next button
+  const btnNext = document.getElementById('btn-next-day')
+  btnNext.style.visibility = isToday ? 'hidden' : 'visible'
+
   const [habits, logs, stats] = await Promise.all([
     getHabits(),
     getHabitLogsForDate(date),
@@ -550,16 +569,25 @@ async function renderDashboard() {
   renderQuickHabits(habits, logs)
   updateDashStats(habits, logs, stats)
 
-  if (stats.steps) document.getElementById('input-steps').value = stats.steps
-  if (stats.sleep) document.getElementById('input-sleep').value = stats.sleep
-  if (stats.mood) {
-    document.querySelectorAll('.humeur-btn').forEach(b => {
-      if (b.textContent === stats.mood) b.classList.add('selected')
-    })
-  }
+  document.getElementById('input-steps').value = stats.steps || ''
+  document.getElementById('input-sleep').value = stats.sleep || ''
+  document.getElementById('input-note').value  = stats.note  || ''
+  document.querySelectorAll('.humeur-btn').forEach(b => {
+    b.classList.toggle('selected', b.textContent === stats.mood)
+  })
 
   renderWeekBars(habits)
   renderWeekChart(habits)
+}
+
+function navigateDay(dir) {
+  const d = new Date(currentDate)
+  d.setDate(d.getDate() + dir)
+  const today = new Date(); today.setHours(0,0,0,0)
+  d.setHours(0,0,0,0)
+  if (d > today) return
+  currentDate = d
+  renderDashboard()
 }
 
 function renderQuickHabits(habits, logs) {
@@ -585,7 +613,7 @@ function renderQuickHabits(habits, logs) {
 }
 
 async function toggleHabit(id) {
-  const date = getDateKey()
+  const date = getDateKey(currentDate)
   const [habits, logs] = await Promise.all([getHabits(), getHabitLogsForDate(date)])
   const currentDone = logs[id] || false
   logs[id] = !currentDone  // optimistic
@@ -624,14 +652,16 @@ function selectMood(el, mood) {
 }
 
 async function saveStats() {
-  const date = getDateKey()
+  const date = getDateKey(currentDate)
   const steps = document.getElementById('input-steps').value
   const sleep  = document.getElementById('input-sleep').value
+  const note   = document.getElementById('input-note').value
   const sel    = document.querySelector('.humeur-btn.selected')
   const stats  = {
     steps: steps ? parseInt(steps) : null,
     sleep: sleep  ? parseFloat(sleep) : null,
-    mood:  sel    ? sel.textContent  : null
+    mood:  sel    ? sel.textContent  : null,
+    note:  note   || null
   }
   await saveDailyStatsDB(date, stats)
   const [habits, logs] = await Promise.all([getHabits(), getHabitLogsForDate(date)])
@@ -914,13 +944,7 @@ async function renderGym() {
                 <div class="ex-progress-fill" id="fill-${di}-${ei}"
                   style="width:${pct}%;background:${done ? '#00e5a0' : day.color}"></div>
               </div>
-              <div class="ex-progress-label" id="label-${di}-${ei}">${state.sets}/${ex.sets}</div>
-            </div>
-            <div class="ex-weight-row">
-              <span class="weight-label" style="font-size:11px;color:var(--muted)">Charge :</span>
-              <input class="weight-input" placeholder="kg" type="number" min="0"
-                value="${state.weight || ''}"
-                onchange="saveWeight(${di},${ei},this.value)" onfocus="this.select()">
+              <div class="ex-progress-label" id="label-${di}-${ei}">${pct}%</div>
             </div>
           </div>`
       })
@@ -983,7 +1007,7 @@ function updateExerciseUI(di, ei, totalSets, color) {
   const fillEl = document.getElementById(`fill-${di}-${ei}`)
   if (fillEl) { fillEl.style.width = pct + '%'; fillEl.style.background = done ? '#00e5a0' : color }
   const labelEl = document.getElementById(`label-${di}-${ei}`)
-  if (labelEl) labelEl.textContent = state.sets + '/' + totalSets
+  if (labelEl) labelEl.textContent = pct + '%'
   const card = document.getElementById(`ex-${di}-${ei}`)
   if (card) {
     card.classList.toggle('completed', done)
@@ -991,12 +1015,6 @@ function updateExerciseUI(di, ei, totalSets, color) {
   }
 }
 
-function saveWeight(di, ei, val) {
-  if (!gymState[di]) gymState[di] = {}
-  if (!gymState[di][ei]) gymState[di][ei] = { sets: 0, weight: '' }
-  gymState[di][ei].weight = val
-  saveGymLogDB(di, ei)
-}
 
 function updateDayBar(di) {
   const day = GYM_PROGRAM[di]
