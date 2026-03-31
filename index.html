@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HSC Daily Tracker</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
     --bg: #0a0a0f;
@@ -49,16 +50,13 @@
   }
 
   .nav-logo { font-family: var(--mono); font-size: 13px; color: var(--c1); letter-spacing: 2px; text-transform: uppercase; }
-
   .nav-tabs { display: flex; gap: 4px; background: var(--bg); padding: 4px; border-radius: 10px; }
-
   .nav-tab {
     padding: 8px 20px; border-radius: 8px; font-size: 13px; font-weight: 500;
     cursor: pointer; border: none; background: transparent; color: var(--muted);
     transition: all 0.2s; font-family: var(--sans);
   }
   .nav-tab.active { background: var(--surface2); color: var(--text); }
-
   .nav-date { font-family: var(--mono); font-size: 11px; color: var(--muted); }
 
   .page { display: none; padding: 24px; max-width: 1200px; margin: 0 auto; }
@@ -68,29 +66,47 @@
   .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
 
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+  .card-title { font-family: var(--mono); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; }
 
-  .card-title {
-    font-family: var(--mono); font-size: 10px; letter-spacing: 2px;
-    text-transform: uppercase; color: var(--muted); margin-bottom: 16px;
-  }
-
-  .stat-card {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 20px; position: relative; overflow: hidden;
-  }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; position: relative; overflow: hidden; }
   .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
   .stat-card.green::before { background: var(--c1); }
-  .stat-card.teal::before { background: var(--c4); }
   .stat-card.purple::before { background: var(--c5); }
   .stat-card.yellow::before { background: var(--c3); }
-
   .stat-label { font-size: 11px; color: var(--muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
   .stat-value { font-family: var(--mono); font-size: 28px; font-weight: 700; line-height: 1; }
   .stat-sub { font-size: 12px; color: var(--muted); margin-top: 6px; }
 
+  /* STEPS GAUGE */
+  .steps-gauge-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 20px; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; position: relative;
+  }
+  .steps-gauge-card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:var(--c4); }
+  .steps-circle-bg {
+    width: 120px; height: 120px; border-radius: 50%; background: #0d1f2d;
+    border: 2px solid #1a3248; overflow: hidden; position: relative;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .steps-fill-layer {
+    position: absolute; bottom: 0; left: -10%; width: 120%;
+    background: linear-gradient(180deg, #3dcf8e 0%, #1aad6c 100%);
+    transition: height 0.6s cubic-bezier(0.34, 1.3, 0.64, 1);
+    border-radius: 40% 40% 0 0;
+  }
+  .steps-fill-layer::before {
+    content: ''; position: absolute; top: -6px; left: -5%; width: 110%;
+    height: 14px; background: rgba(255,255,255,0.12); border-radius: 50%;
+  }
+  .steps-text-layer { position: relative; z-index: 2; text-align: center; line-height: 1; }
+  .steps-goal-label { font-size: 9px; color: rgba(255,255,255,0.55); font-family: var(--mono); letter-spacing: 0.5px; margin-bottom: 2px; }
+  .steps-foot { font-size: 13px; margin-bottom: 2px; }
+  .steps-number { font-family: var(--mono); font-size: 22px; font-weight: 700; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.4); }
+  .steps-sub-label { font-size: 9px; color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: 1px; margin-top: 3px; font-family: var(--mono); }
+
   /* HABITS */
   .habits-grid { display: flex; flex-direction: column; gap: 10px; }
-
   .habit-row {
     display: flex; align-items: center; justify-content: space-between;
     padding: 12px 16px; background: var(--surface2); border-radius: 8px;
@@ -98,19 +114,16 @@
   }
   .habit-row:hover { border-color: var(--muted); }
   .habit-row.done { border-color: transparent; opacity: 0.7; }
-
   .habit-left { display: flex; align-items: center; gap: 12px; cursor: pointer; flex: 1; }
   .habit-emoji { font-size: 18px; }
   .habit-name { font-size: 14px; font-weight: 500; }
   .habit-row.done .habit-name { text-decoration: line-through; color: var(--muted); }
-
   .habit-check {
     width: 24px; height: 24px; border-radius: 6px; border: 2px solid var(--border);
     display: flex; align-items: center; justify-content: center; font-size: 14px;
     transition: all 0.2s; flex-shrink: 0; cursor: pointer;
   }
   .habit-row.done .habit-check { border-color: transparent; color: white; }
-
   .habit-delete {
     width: 24px; height: 24px; border-radius: 6px; border: none;
     background: transparent; color: var(--muted); font-size: 14px;
@@ -124,50 +137,23 @@
     display: flex; align-items: center; justify-content: center; gap: 8px;
     padding: 12px; border-radius: 8px; border: 1px dashed var(--border);
     background: transparent; color: var(--muted); cursor: pointer;
-    font-size: 13px; font-family: var(--sans); transition: all 0.2s; width: 100%;
-    margin-top: 4px;
+    font-size: 13px; font-family: var(--sans); transition: all 0.2s; width: 100%; margin-top: 4px;
   }
   .add-habit-btn:hover { border-color: var(--c1); color: var(--c1); }
-
-  .add-habit-form {
-    display: none; flex-direction: column; gap: 10px;
-    padding: 16px; background: var(--surface2); border-radius: 8px;
-    border: 1px solid var(--border); margin-top: 4px;
-  }
+  .add-habit-form { display: none; flex-direction: column; gap: 10px; padding: 16px; background: var(--surface2); border-radius: 8px; border: 1px solid var(--border); margin-top: 4px; }
   .add-habit-form.open { display: flex; }
-
   .form-row { display: flex; gap: 8px; align-items: center; }
-
-  .form-input {
-    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
-    padding: 8px 12px; color: var(--text); font-family: var(--sans); font-size: 13px;
-    outline: none; transition: border-color 0.2s;
-  }
+  .form-input { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; color: var(--text); font-family: var(--sans); font-size: 13px; outline: none; transition: border-color 0.2s; }
   .form-input:focus { border-color: var(--c1); }
   .form-input.emoji-input { width: 56px; text-align: center; font-size: 18px; }
   .form-input.name-input { flex: 1; }
-
   .color-picker { display: flex; gap: 6px; flex-wrap: wrap; }
-  .color-opt {
-    width: 22px; height: 22px; border-radius: 50%; cursor: pointer;
-    border: 2px solid transparent; transition: all 0.15s;
-  }
+  .color-opt { width: 22px; height: 22px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: all 0.15s; }
   .color-opt.selected { border-color: white; transform: scale(1.15); }
-
   .form-actions { display: flex; gap: 8px; }
-
-  .btn-add {
-    background: var(--c1); color: #000; border: none; border-radius: 6px;
-    padding: 8px 16px; font-family: var(--mono); font-size: 11px; font-weight: 700;
-    cursor: pointer; transition: all 0.2s;
-  }
+  .btn-add { background: var(--c1); color: #000; border: none; border-radius: 6px; padding: 8px 16px; font-family: var(--mono); font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
   .btn-add:hover { opacity: 0.85; }
-
-  .btn-cancel {
-    background: var(--surface); color: var(--muted); border: 1px solid var(--border);
-    border-radius: 6px; padding: 8px 16px; font-family: var(--mono); font-size: 11px;
-    cursor: pointer; transition: all 0.2s;
-  }
+  .btn-cancel { background: var(--surface); color: var(--muted); border: 1px solid var(--border); border-radius: 6px; padding: 8px 16px; font-family: var(--mono); font-size: 11px; cursor: pointer; transition: all 0.2s; }
   .btn-cancel:hover { color: var(--text); }
 
   /* BARS / CHARTS */
@@ -177,7 +163,6 @@
   .bar-track { flex: 1; height: 8px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
   .bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
   .bar-pct { font-family: var(--mono); font-size: 11px; color: var(--muted); width: 36px; text-align: right; flex-shrink: 0; }
-
   .chart-wrap { display: flex; align-items: flex-end; gap: 4px; height: 80px; padding-top: 8px; }
   .chart-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; }
   .chart-bar { width: 100%; border-radius: 3px 3px 0 0; min-height: 2px; transition: height 0.5s ease; }
@@ -186,263 +171,70 @@
   .stats-form { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
   .input-group { display: flex; flex-direction: column; gap: 8px; }
   .input-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
-  .input-field {
-    background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
-    padding: 12px 16px; color: var(--text); font-family: var(--mono); font-size: 16px;
-    font-weight: 700; width: 100%; transition: border-color 0.2s; outline: none;
-  }
+  .input-field { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; color: var(--text); font-family: var(--mono); font-size: 16px; font-weight: 700; width: 100%; transition: border-color 0.2s; outline: none; }
   .input-field:focus { border-color: var(--c1); }
-
   .humeur-btns { display: flex; gap: 6px; }
-  .humeur-btn {
-    flex: 1; padding: 10px 4px; border-radius: 8px; border: 1px solid var(--border);
-    background: var(--surface2); cursor: pointer; font-size: 18px; transition: all 0.2s; text-align: center;
-  }
+  .humeur-btn { flex: 1; padding: 10px 4px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); cursor: pointer; font-size: 18px; transition: all 0.2s; text-align: center; }
   .humeur-btn:hover { border-color: var(--muted); transform: scale(1.05); }
   .humeur-btn.selected { border-color: var(--c1); background: rgba(0,229,160,0.1); }
 
   /* SECTION TITLE */
-  .section-title {
-    font-family: var(--mono); font-size: 11px; letter-spacing: 2px;
-    text-transform: uppercase; color: var(--muted);
-    margin-bottom: 16px; margin-top: 28px;
-    padding-bottom: 8px; border-bottom: 1px solid var(--border);
-  }
+  .section-title { font-family: var(--mono); font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; margin-top: 28px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
   .section-title:first-child { margin-top: 0; }
 
   /* MONTHLY GRID */
-  .month-grid {
-    display: grid;
-    grid-template-columns: 140px repeat(31, 1fr);
-    gap: 2px; font-size: 10px;
-  }
-  .month-cell {
-    height: 22px; display: flex; align-items: center; justify-content: center;
-    border-radius: 3px; font-family: var(--mono); font-size: 9px; color: var(--muted);
-  }
-  .month-habit-name {
-    font-size: 11px; color: var(--text); padding: 2px 6px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    display: flex; align-items: center; height: 22px;
-  }
-  .month-dot {
-    height: 22px; border-radius: 3px; cursor: pointer;
-    transition: all 0.15s; border: 1px solid transparent;
-  }
+  .month-grid { display: grid; grid-template-columns: 140px repeat(31, 1fr); gap: 2px; font-size: 10px; }
+  .month-cell { height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 3px; font-family: var(--mono); font-size: 9px; color: var(--muted); }
+  .month-habit-name { font-size: 11px; color: var(--text); padding: 2px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; height: 22px; }
+  .month-dot { height: 22px; border-radius: 3px; cursor: pointer; transition: all 0.15s; border: 1px solid transparent; }
   .month-dot.empty { background: var(--surface2); border-color: var(--border); }
   .month-dot.future { background: transparent; border: 1px solid var(--border); opacity: 0.3; cursor: default; }
   .month-dot:not(.future):hover { transform: scale(1.1); }
-
-  /* STREAK CARDS */
   .streak-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
 
-  /* ===================== GYM ===================== */
-  .gym-day {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); overflow: hidden; margin-bottom: 12px;
-    transition: border-color 0.3s;
-  }
-
-  .gym-day-header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 16px 20px; cursor: pointer; transition: background 0.2s;
-  }
+  /* GYM */
+  .gym-day { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 12px; transition: border-color 0.3s; }
+  .gym-day-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; cursor: pointer; transition: background 0.2s; }
   .gym-day-header:hover { background: var(--surface2); }
-
   .gym-day-title { display: flex; align-items: center; gap: 12px; }
   .gym-day-dot { width: 10px; height: 10px; border-radius: 50%; }
   .gym-day-name { font-weight: 600; font-size: 15px; }
   .gym-day-muscle { font-size: 12px; color: var(--muted); margin-top: 2px; }
-
   .gym-day-meta { display: flex; align-items: center; gap: 12px; }
-  .gym-day-progress-pill {
-    font-family: var(--mono); font-size: 11px; color: var(--muted);
-    background: var(--surface2); border: 1px solid var(--border);
-    border-radius: 20px; padding: 3px 10px;
-  }
-
+  .gym-day-progress-pill { font-family: var(--mono); font-size: 11px; color: var(--muted); background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 3px 10px; }
   .gym-day-body { padding: 0 20px 20px; display: none; }
   .gym-day-body.open { display: block; }
-
-  /* EXERCISE CARD */
-  .exercise-card {
-    background: var(--surface2); border: 1px solid var(--border);
-    border-radius: 10px; padding: 16px; margin-bottom: 10px;
-    transition: all 0.3s;
-  }
-  .exercise-card.completed {
-    border-color: var(--c1); background: rgba(0,229,160,0.05);
-  }
-
+  .exercise-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 10px; transition: all 0.3s; }
+  .exercise-card.completed { border-color: var(--c1); background: rgba(0,229,160,0.05); }
   .ex-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
   .ex-name { font-weight: 600; font-size: 14px; }
   .ex-target { font-size: 12px; color: var(--muted); font-family: var(--mono); }
-
-  .ex-completed-badge {
-    display: none; align-items: center; gap: 6px;
-    color: var(--c1); font-size: 12px; font-family: var(--mono); font-weight: 700;
-  }
+  .ex-completed-badge { display: none; align-items: center; gap: 6px; color: var(--c1); font-size: 12px; font-family: var(--mono); font-weight: 700; }
   .exercise-card.completed .ex-completed-badge { display: flex; }
   .exercise-card.completed .ex-target { display: none; }
-
-  /* SET BUBBLES */
   .sets-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-
-  .set-bubble {
-    width: 40px; height: 40px; border-radius: 10px;
-    border: 2px solid var(--border); background: var(--bg);
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer; transition: all 0.2s; font-family: var(--mono);
-    font-size: 12px; font-weight: 700; color: var(--muted);
-    user-select: none; flex-shrink: 0;
-  }
+  .set-bubble { width: 40px; height: 40px; border-radius: 10px; border: 2px solid var(--border); background: var(--bg); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--muted); user-select: none; flex-shrink: 0; }
   .set-bubble:hover:not(.done) { border-color: var(--muted); color: var(--text); transform: scale(1.05); }
-  .set-bubble.done {
-    border-color: transparent; color: #000; font-size: 14px;
-    transform: scale(1.0);
-  }
+  .set-bubble.done { border-color: transparent; color: #000; font-size: 14px; }
   .set-bubble.done:hover { transform: scale(1.05); opacity: 0.8; }
-
-  /* PROGRESS BAR (GYM) */
   .ex-progress-wrap { display: flex; align-items: center; gap: 10px; }
-  .ex-progress-track {
-    flex: 1; height: 6px; background: var(--bg);
-    border-radius: 3px; overflow: hidden;
-  }
-  .ex-progress-fill {
-    height: 100%; border-radius: 3px;
-    transition: width 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-  }
-  .ex-progress-label {
-    font-family: var(--mono); font-size: 11px; color: var(--muted);
-    flex-shrink: 0; width: 28px; text-align: right;
-  }
-
-  /* LOG WEIGHT INPUTS */
-  .ex-weight-row {
-    display: flex; align-items: center; gap: 8px; margin-top: 10px;
-    flex-wrap: wrap;
-  }
-  .weight-input {
-    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
-    padding: 6px 10px; color: var(--text); font-family: var(--mono); font-size: 12px;
-    width: 72px; text-align: center; outline: none; transition: border-color 0.2s;
-  }
+  .ex-progress-track { flex: 1; height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+  .ex-progress-fill { height: 100%; border-radius: 3px; transition: width 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  .ex-progress-label { font-family: var(--mono); font-size: 11px; color: var(--muted); flex-shrink: 0; width: 28px; text-align: right; }
+  .ex-weight-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .weight-input { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; color: var(--text); font-family: var(--mono); font-size: 12px; width: 72px; text-align: center; outline: none; transition: border-color 0.2s; }
   .weight-input:focus { border-color: var(--c4); }
-  .weight-label { font-size: 11px; color: var(--muted); }
+  .gym-day-total-bar { height: 3px; background: var(--bg); border-radius: 0 0 var(--radius) var(--radius); overflow: hidden; }
+  .gym-day-total-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
 
-  /* DAY TOTAL BAR */
-  .gym-day-total-bar {
-    height: 3px; background: var(--bg); border-radius: 0 0 var(--radius) var(--radius);
-    overflow: hidden;
-  }
-  .gym-day-total-fill {
-    height: 100%; border-radius: 3px;
-    transition: width 0.5s ease;
-  }
-
-  /* SAVE BTN */
-  .btn-save {
-    background: var(--c1); color: #000; border: none; border-radius: 8px;
-    padding: 12px 24px; font-family: var(--mono); font-size: 12px; font-weight: 700;
-    letter-spacing: 1px; cursor: pointer; transition: all 0.2s; margin-top: 16px;
-  }
+  .btn-save { background: var(--c1); color: #000; border: none; border-radius: 8px; padding: 12px 24px; font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: 1px; cursor: pointer; transition: all 0.2s; margin-top: 16px; }
   .btn-save:hover { opacity: 0.85; transform: translateY(-1px); }
 
-  /* STEPS GAUGE */
-  .steps-gauge-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-  }
-  .steps-gauge-card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:var(--c4); }
+  /* LOADING */
+  .loading-pulse { opacity: 0.4; animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:0.8} }
 
-  .steps-circle-wrap {
-    position: relative;
-    width: 120px;
-    height: 120px;
-  }
-
-  .steps-circle-bg {
-    width: 120px;
-    height: 120px;
-    border-radius: 50%;
-    background: #0d1f2d;
-    border: 2px solid #1a3248;
-    overflow: hidden;
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .steps-fill-layer {
-    position: absolute;
-    bottom: 0;
-    left: -10%;
-    width: 120%;
-    background: linear-gradient(180deg, #3dcf8e 0%, #1aad6c 100%);
-    transition: height 0.6s cubic-bezier(0.34, 1.3, 0.64, 1);
-    border-radius: 40% 40% 0 0;
-  }
-
-  .steps-fill-layer::before {
-    content: '';
-    position: absolute;
-    top: -6px;
-    left: -5%;
-    width: 110%;
-    height: 14px;
-    background: rgba(255,255,255,0.12);
-    border-radius: 50%;
-  }
-
-  .steps-text-layer {
-    position: relative;
-    z-index: 2;
-    text-align: center;
-    line-height: 1;
-  }
-
-  .steps-goal-label {
-    font-size: 9px;
-    color: rgba(255,255,255,0.55);
-    font-family: var(--mono);
-    letter-spacing: 0.5px;
-    margin-bottom: 2px;
-  }
-
-  .steps-foot { font-size: 13px; margin-bottom: 2px; }
-
-  .steps-number {
-    font-family: var(--mono);
-    font-size: 22px;
-    font-weight: 700;
-    color: #fff;
-    text-shadow: 0 1px 4px rgba(0,0,0,0.4);
-  }
-
-  .steps-sub-label {
-    font-size: 9px;
-    color: rgba(255,255,255,0.6);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    margin-top: 3px;
-    font-family: var(--mono);
-  }
-
-  .toast {
-    position: fixed; bottom: 24px; right: 24px;
-    background: var(--c1); color: #000; padding: 12px 20px; border-radius: 8px;
-    font-family: var(--mono); font-size: 12px; font-weight: 700; z-index: 999;
-    transform: translateY(80px); opacity: 0; transition: all 0.3s;
-  }
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--c1); color: #000; padding: 12px 20px; border-radius: 8px; font-family: var(--mono); font-size: 12px; font-weight: 700; z-index: 999; transform: translateY(80px); opacity: 0; transition: all 0.3s; }
   .toast.show { transform: translateY(0); opacity: 1; }
 
   @media (max-width: 768px) {
@@ -475,30 +267,28 @@
   <div class="grid-4" style="margin-bottom:16px">
     <div class="stat-card green">
       <div class="stat-label">Habitudes</div>
-      <div class="stat-value" id="dash-done" style="color:var(--c1)">0/0</div>
+      <div class="stat-value loading-pulse" id="dash-done" style="color:var(--c1)">—</div>
       <div class="stat-sub">complétées aujourd'hui</div>
     </div>
     <div class="steps-gauge-card">
-      <div class="steps-circle-wrap">
-        <div class="steps-circle-bg">
-          <div class="steps-fill-layer" id="steps-fill" style="height:0%"></div>
-          <div class="steps-text-layer">
-            <div class="steps-goal-label" id="steps-goal-label">Goal : 10000</div>
-            <div class="steps-foot">👣</div>
-            <div class="steps-number" id="dash-steps">—</div>
-            <div class="steps-sub-label">Steps</div>
-          </div>
+      <div class="steps-circle-bg">
+        <div class="steps-fill-layer" id="steps-fill" style="height:0%"></div>
+        <div class="steps-text-layer">
+          <div class="steps-goal-label" id="steps-goal-label">Goal : 10 000</div>
+          <div class="steps-foot">👣</div>
+          <div class="steps-number" id="dash-steps">—</div>
+          <div class="steps-sub-label">Steps</div>
         </div>
       </div>
     </div>
     <div class="stat-card purple">
       <div class="stat-label">Sommeil</div>
-      <div class="stat-value" id="dash-sleep" style="color:var(--c5)">—</div>
+      <div class="stat-value loading-pulse" id="dash-sleep" style="color:var(--c5)">—</div>
       <div class="stat-sub">heures cette nuit</div>
     </div>
     <div class="stat-card yellow">
       <div class="stat-label">Humeur</div>
-      <div class="stat-value" id="dash-mood" style="font-size:28px">—</div>
+      <div class="stat-value loading-pulse" id="dash-mood" style="font-size:28px">—</div>
       <div class="stat-sub">du jour</div>
     </div>
   </div>
@@ -506,7 +296,7 @@
   <div class="grid-2" style="margin-bottom:16px">
     <div class="card">
       <div class="card-title">Check rapide — habitudes du jour</div>
-      <div class="habits-grid" id="quick-habits"></div>
+      <div class="habits-grid" id="quick-habits"><div class="loading-pulse" style="color:var(--muted);font-size:13px;padding:8px">Chargement...</div></div>
     </div>
     <div class="card">
       <div class="card-title">Stats journalières</div>
@@ -535,7 +325,6 @@
   </div>
 
   <p class="section-title">Cette semaine</p>
-
   <div class="grid-2">
     <div class="card">
       <div class="card-title">Progression habitudes — 7 jours</div>
@@ -544,14 +333,14 @@
     <div class="card">
       <div class="card-title">Activité hebdo</div>
       <div class="chart-wrap" id="week-chart"></div>
-      <div style="display:flex; justify-content:space-between; margin-top:8px">
-        <span style="font-size:11px; color:var(--muted)">Lun</span>
-        <span style="font-size:11px; color:var(--muted)">Mar</span>
-        <span style="font-size:11px; color:var(--muted)">Mer</span>
-        <span style="font-size:11px; color:var(--muted)">Jeu</span>
-        <span style="font-size:11px; color:var(--muted)">Ven</span>
-        <span style="font-size:11px; color:var(--muted)">Sam</span>
-        <span style="font-size:11px; color:var(--muted)">Dim</span>
+      <div style="display:flex;justify-content:space-between;margin-top:8px">
+        <span style="font-size:11px;color:var(--muted)">Lun</span>
+        <span style="font-size:11px;color:var(--muted)">Mar</span>
+        <span style="font-size:11px;color:var(--muted)">Mer</span>
+        <span style="font-size:11px;color:var(--muted)">Jeu</span>
+        <span style="font-size:11px;color:var(--muted)">Ven</span>
+        <span style="font-size:11px;color:var(--muted)">Sam</span>
+        <span style="font-size:11px;color:var(--muted)">Dim</span>
       </div>
     </div>
   </div>
@@ -560,21 +349,16 @@
 <!-- HABITUDES -->
 <div class="page" id="page-habits">
   <p class="section-title">Tracker du mois — <span id="month-name"></span></p>
-
-  <div class="card" style="overflow-x:auto; margin-bottom:16px">
+  <div class="card" style="overflow-x:auto;margin-bottom:16px">
     <div class="month-grid" id="month-grid"></div>
   </div>
-
   <p class="section-title">Gérer mes habitudes</p>
-
   <div class="card" style="margin-bottom:16px">
     <div class="card-title">Mes habitudes</div>
     <div id="manage-habits-list"></div>
-
-    <button class="add-habit-btn" id="toggle-add-form" onclick="toggleAddForm()">
+    <button class="add-habit-btn" onclick="toggleAddForm()">
       <span style="font-size:16px">+</span> Ajouter une habitude
     </button>
-
     <div class="add-habit-form" id="add-habit-form">
       <div class="form-row">
         <input class="form-input emoji-input" id="new-emoji" type="text" placeholder="🎯" maxlength="2">
@@ -590,7 +374,6 @@
       </div>
     </div>
   </div>
-
   <p class="section-title">Streaks & Stats</p>
   <div class="streak-grid" id="streak-cards"></div>
 </div>
@@ -604,14 +387,14 @@
 <div class="toast" id="toast"></div>
 
 <script>
-// ─── COULEURS DISPONIBLES ───────────────────────────────────────────────────
-const PALETTE = [
-  '#00e5a0','#ff6b6b','#ffd166','#4ecdc4',
-  '#a855f7','#fb923c','#38bdf8','#f472b6',
-  '#84cc16','#facc15','#e879f9','#2dd4bf'
-];
+// ─── SUPABASE ────────────────────────────────────────────────────────────────
+const SUPABASE_URL = 'https://beglxjhsgfuutpjcxydo.supabase.co'
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJlZ2x4amhzZ2Z1dXRwamN4eWRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5NTI4NTEsImV4cCI6MjA5MDUyODg1MX0.u6mqsYQKDRzcGDARrdq1C0I71SfS0UXSo06kDH_FSqc'
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
 
-// ─── HABITUDES (persistées en localStorage) ─────────────────────────────────
+// ─── CONSTANTES ──────────────────────────────────────────────────────────────
+const PALETTE = ['#00e5a0','#ff6b6b','#ffd166','#4ecdc4','#a855f7','#fb923c','#38bdf8','#f472b6','#84cc16','#facc15','#e879f9','#2dd4bf']
+
 const DEFAULT_HABITS = [
   { id:'wake',  name:'Réveil 7h30',      emoji:'⏰', color:'#ffd166' },
   { id:'gym',   name:'Séance gym',        emoji:'💪', color:'#ff6b6b' },
@@ -621,18 +404,8 @@ const DEFAULT_HABITS = [
   { id:'tech',  name:'Tâche tech',        emoji:'🛠', color:'#a855f7' },
   { id:'jrnl',  name:'Journaling',        emoji:'📓', color:'#fb923c' },
   { id:'soda',  name:'No soda',           emoji:'🚫', color:'#00e5a0' },
-];
+]
 
-function getHabits() {
-  const stored = localStorage.getItem('hsc_habits');
-  return stored ? JSON.parse(stored) : DEFAULT_HABITS;
-}
-
-function saveHabits(habits) {
-  localStorage.setItem('hsc_habits', JSON.stringify(habits));
-}
-
-// ─── PROGRAMME SALLE ────────────────────────────────────────────────────────
 const GYM_PROGRAM = [
   { day:'Lundi',    muscle:'Pectoraux',   color:'#ff6b6b', exercises:[
     {name:'Développé couché',     sets:4, reps:10},
@@ -671,91 +444,133 @@ const GYM_PROGRAM = [
   ]},
   { day:'Samedi',   muscle:'Repos actif', color:'#00e5a0', exercises:[]},
   { day:'Dimanche', muscle:'Repos',       color:'#6b6b80', exercises:[]},
-];
+]
 
-// ─── STATE GYM (en mémoire pour la session) ─────────────────────────────────
-// gymState[dayIndex][exIndex] = { sets: N (nombre de séries faites), weight: 'xxx' }
-let gymState = {};
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let habitsCache = null
+let gymState = {}  // { dayIndex: { exIndex: { sets, weight } } }
 
-function getGymKey() { return 'hsc_gym_' + getDateKey(); }
-
-function loadGymState() {
-  const raw = localStorage.getItem(getGymKey());
-  gymState = raw ? JSON.parse(raw) : {};
-}
-
-function saveGymState() {
-  localStorage.setItem(getGymKey(), JSON.stringify(gymState));
-}
-
-// ─── DONNÉES JOURNALIÈRES ───────────────────────────────────────────────────
+// ─── UTILS ───────────────────────────────────────────────────────────────────
 function getDateKey(d) {
-  const date = d || new Date();
-  return date.toISOString().split('T')[0];
+  const date = d || new Date()
+  return date.toISOString().split('T')[0]
 }
-function getData() { return JSON.parse(localStorage.getItem('hsc_data') || '{}'); }
-function saveData(data) { localStorage.setItem('hsc_data', JSON.stringify(data)); }
-function getTodayData() {
-  const data = getData();
-  const key = getDateKey();
-  if (!data[key]) data[key] = { habits:{}, steps:null, sleep:null, mood:null };
-  return data[key];
-}
-function saveTodayData(d) { const data=getData(); data[getDateKey()]=d; saveData(data); }
 
-// ─── UI UTILS ───────────────────────────────────────────────────────────────
 function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2200);
+  const t = document.getElementById('toast')
+  t.textContent = msg
+  t.classList.add('show')
+  setTimeout(() => t.classList.remove('show'), 2200)
 }
 
 function updateNavDate() {
-  const days = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
-  const months = ['jan','fév','mar','avr','mai','jun','jul','aoû','sep','oct','nov','déc'];
-  const d = new Date();
+  const days = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam']
+  const months = ['jan','fév','mar','avr','mai','jun','jul','aoû','sep','oct','nov','déc']
+  const d = new Date()
   document.getElementById('nav-date').textContent =
-    `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+    `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`
   document.getElementById('month-name').textContent =
-    ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'][d.getMonth()] + ' ' + d.getFullYear();
+    ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'][d.getMonth()] + ' ' + d.getFullYear()
 }
 
 function showPage(id, tabEl) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-  document.getElementById('page-' + id).classList.add('active');
-  tabEl.classList.add('active');
-  if (id === 'habits') renderHabitsPage();
-  if (id === 'gym') renderGym();
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'))
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'))
+  document.getElementById('page-' + id).classList.add('active')
+  tabEl.classList.add('active')
+  if (id === 'habits') renderHabitsPage()
+  if (id === 'gym') renderGym()
 }
 
-// ─── DASHBOARD ──────────────────────────────────────────────────────────────
-function renderDashboard() {
-  const today = getTodayData();
-  renderQuickHabits(today);
-  updateDashStats(today);
-  renderWeekBars();
-  renderWeekChart();
-  if (today.steps) document.getElementById('input-steps').value = today.steps;
-  if (today.sleep) document.getElementById('input-sleep').value = today.sleep;
-  if (today.mood) {
-    document.querySelectorAll('.humeur-btn').forEach(b => {
-      if (b.textContent === today.mood) b.classList.add('selected');
-    });
+// ─── HABITUDES (DB) ──────────────────────────────────────────────────────────
+async function getHabits(forceRefresh = false) {
+  if (habitsCache && !forceRefresh) return habitsCache
+  const { data } = await sb.from('habits').select('*').order('sort_order')
+  if (!data || data.length === 0) {
+    await sb.from('habits').insert(DEFAULT_HABITS.map((h, i) => ({ ...h, sort_order: i })))
+    habitsCache = DEFAULT_HABITS
+  } else {
+    habitsCache = data
   }
+  return habitsCache
 }
 
-function renderQuickHabits(today) {
-  const HABITS = getHabits();
-  const container = document.getElementById('quick-habits');
-  container.innerHTML = '';
-  HABITS.forEach(h => {
-    const done = today.habits[h.id];
-    const row = document.createElement('div');
-    row.className = 'habit-row' + (done ? ' done' : '');
-    row.style.borderColor = done ? h.color : '';
-    row.style.background = done ? h.color + '18' : '';
+// ─── HABIT LOGS (DB) ─────────────────────────────────────────────────────────
+async function getHabitLogsForDate(date) {
+  const { data } = await sb.from('habit_logs').select('habit_id, done').eq('date', date)
+  const map = {}
+  ;(data || []).forEach(r => { map[r.habit_id] = r.done })
+  return map
+}
+
+async function toggleHabitDB(habitId, date, currentDone) {
+  await sb.from('habit_logs').upsert(
+    { habit_id: habitId, date, done: !currentDone },
+    { onConflict: 'habit_id,date' }
+  )
+}
+
+// ─── DAILY STATS (DB) ────────────────────────────────────────────────────────
+async function getDailyStats(date) {
+  const { data } = await sb.from('daily_stats').select('*').eq('date', date).maybeSingle()
+  return data || { date, steps: null, sleep: null, mood: null }
+}
+
+async function saveDailyStatsDB(date, stats) {
+  await sb.from('daily_stats').upsert({ date, ...stats }, { onConflict: 'date' })
+}
+
+// ─── GYM LOGS (DB) ───────────────────────────────────────────────────────────
+async function loadGymStateFromDB() {
+  const { data } = await sb.from('gym_logs').select('*').eq('date', getDateKey())
+  gymState = {}
+  ;(data || []).forEach(r => {
+    if (!gymState[r.day_index]) gymState[r.day_index] = {}
+    gymState[r.day_index][r.exercise_index] = { sets: r.sets_done, weight: r.weight || '' }
+  })
+}
+
+async function saveGymLogDB(di, ei) {
+  const s = gymState[di]?.[ei] || { sets: 0, weight: '' }
+  await sb.from('gym_logs').upsert(
+    { date: getDateKey(), day_index: di, exercise_index: ei, sets_done: s.sets, weight: s.weight || null },
+    { onConflict: 'date,day_index,exercise_index' }
+  )
+}
+
+// ─── DASHBOARD ───────────────────────────────────────────────────────────────
+async function renderDashboard() {
+  const date = getDateKey()
+  const [habits, logs, stats] = await Promise.all([
+    getHabits(),
+    getHabitLogsForDate(date),
+    getDailyStats(date)
+  ])
+
+  renderQuickHabits(habits, logs)
+  updateDashStats(habits, logs, stats)
+
+  if (stats.steps) document.getElementById('input-steps').value = stats.steps
+  if (stats.sleep) document.getElementById('input-sleep').value = stats.sleep
+  if (stats.mood) {
+    document.querySelectorAll('.humeur-btn').forEach(b => {
+      if (b.textContent === stats.mood) b.classList.add('selected')
+    })
+  }
+
+  renderWeekBars(habits)
+  renderWeekChart(habits)
+}
+
+function renderQuickHabits(habits, logs) {
+  const container = document.getElementById('quick-habits')
+  container.innerHTML = ''
+  habits.forEach(h => {
+    const done = logs[h.id] || false
+    const row = document.createElement('div')
+    row.className = 'habit-row' + (done ? ' done' : '')
+    row.style.borderColor = done ? h.color : ''
+    row.style.background = done ? h.color + '18' : ''
     row.innerHTML = `
       <div class="habit-left" onclick="toggleHabit('${h.id}')">
         <span class="habit-emoji">${h.emoji}</span>
@@ -764,112 +579,127 @@ function renderQuickHabits(today) {
       <div class="habit-check" style="${done ? 'background:'+h.color : ''}" onclick="toggleHabit('${h.id}')">
         ${done ? '✓' : ''}
       </div>
-    `;
-    container.appendChild(row);
-  });
+    `
+    container.appendChild(row)
+  })
 }
 
-function toggleHabit(id) {
-  const today = getTodayData();
-  today.habits[id] = !today.habits[id];
-  saveTodayData(today);
-  renderQuickHabits(today);
-  updateDashStats(today);
-  renderWeekBars();
-  renderWeekChart();
-  if (document.getElementById('page-habits').classList.contains('active')) renderHabitsPage();
+async function toggleHabit(id) {
+  const date = getDateKey()
+  const [habits, logs] = await Promise.all([getHabits(), getHabitLogsForDate(date)])
+  const currentDone = logs[id] || false
+  logs[id] = !currentDone  // optimistic
+  renderQuickHabits(habits, logs)
+  document.getElementById('dash-done').textContent =
+    Object.values(logs).filter(Boolean).length + '/' + habits.length
+  await toggleHabitDB(id, date, currentDone)
+  renderWeekBars(habits)
+  renderWeekChart(habits)
+  if (document.getElementById('page-habits').classList.contains('active')) renderMonthGrid()
 }
 
-function updateDashStats(today) {
-  const HABITS = getHabits();
-  const done = Object.values(today.habits).filter(Boolean).length;
-  document.getElementById('dash-done').textContent = done + '/' + HABITS.length;
-  const stepsGoal = 10000;
-  const stepsVal = today.steps || 0;
-  const stepsPct = Math.min(Math.round((stepsVal / stepsGoal) * 100), 100);
-  document.getElementById('dash-steps').textContent = stepsVal ? stepsVal.toLocaleString() : '—';
-  document.getElementById('steps-fill').style.height = stepsVal ? stepsPct + '%' : '0%';
-  document.getElementById('steps-goal-label').textContent = 'Goal : ' + stepsGoal.toLocaleString();
-  document.getElementById('dash-sleep').textContent = today.sleep ? today.sleep + 'h' : '—';
-  document.getElementById('dash-mood').textContent = today.mood || '—';
+function updateDashStats(habits, logs, stats) {
+  const done = Object.values(logs).filter(Boolean).length
+  const el = document.getElementById('dash-done')
+  el.textContent = done + '/' + habits.length
+  el.classList.remove('loading-pulse')
+
+  const stepsVal = stats?.steps || 0
+  const stepsPct = Math.min(Math.round((stepsVal / 10000) * 100), 100)
+  document.getElementById('dash-steps').textContent = stepsVal ? stepsVal.toLocaleString() : '—'
+  document.getElementById('steps-fill').style.height = stepsVal ? stepsPct + '%' : '0%'
+
+  const sleepEl = document.getElementById('dash-sleep')
+  sleepEl.textContent = stats?.sleep ? stats.sleep + 'h' : '—'
+  sleepEl.classList.remove('loading-pulse')
+
+  const moodEl = document.getElementById('dash-mood')
+  moodEl.textContent = stats?.mood || '—'
+  moodEl.classList.remove('loading-pulse')
 }
 
 function selectMood(el, mood) {
-  document.querySelectorAll('.humeur-btn').forEach(b => b.classList.remove('selected'));
-  el.classList.add('selected');
+  document.querySelectorAll('.humeur-btn').forEach(b => b.classList.remove('selected'))
+  el.classList.add('selected')
 }
 
-function saveStats() {
-  const today = getTodayData();
-  const steps = document.getElementById('input-steps').value;
-  const sleep = document.getElementById('input-sleep').value;
-  const sel = document.querySelector('.humeur-btn.selected');
-  today.steps = steps ? parseInt(steps) : null;
-  today.sleep = sleep ? parseFloat(sleep) : null;
-  today.mood = sel ? sel.textContent : null;
-  saveTodayData(today);
-  updateDashStats(today);
-  showToast('✓ Stats sauvegardées');
+async function saveStats() {
+  const date = getDateKey()
+  const steps = document.getElementById('input-steps').value
+  const sleep  = document.getElementById('input-sleep').value
+  const sel    = document.querySelector('.humeur-btn.selected')
+  const stats  = {
+    steps: steps ? parseInt(steps) : null,
+    sleep: sleep  ? parseFloat(sleep) : null,
+    mood:  sel    ? sel.textContent  : null
+  }
+  await saveDailyStatsDB(date, stats)
+  const [habits, logs] = await Promise.all([getHabits(), getHabitLogsForDate(date)])
+  updateDashStats(habits, logs, stats)
+  showToast('✓ Stats sauvegardées')
 }
 
-function renderWeekBars() {
-  const HABITS = getHabits();
-  const container = document.getElementById('week-bars');
-  container.innerHTML = '';
-  const data = getData();
-  HABITS.forEach(h => {
-    let count = 0;
-    for (let d = 6; d >= 0; d--) {
-      const date = new Date(); date.setDate(date.getDate() - d);
-      const key = getDateKey(date);
-      if (data[key]?.habits?.[h.id]) count++;
-    }
-    const pct = Math.round((count / 7) * 100);
-    const row = document.createElement('div');
-    row.className = 'bar-row';
+async function renderWeekBars(habits) {
+  const container = document.getElementById('week-bars')
+  container.innerHTML = ''
+  const dates = []
+  for (let d = 6; d >= 0; d--) {
+    const date = new Date(); date.setDate(date.getDate() - d)
+    dates.push(getDateKey(date))
+  }
+  const { data: logs } = await sb.from('habit_logs')
+    .select('habit_id, done, date').in('date', dates).eq('done', true)
+
+  habits.forEach(h => {
+    const count = (logs || []).filter(l => l.habit_id === h.id).length
+    const pct = Math.round((count / 7) * 100)
+    const row = document.createElement('div')
+    row.className = 'bar-row'
     row.innerHTML = `
       <div class="bar-name">${h.emoji} ${h.name}</div>
       <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${h.color}"></div></div>
       <div class="bar-pct">${pct}%</div>
-    `;
-    container.appendChild(row);
-  });
+    `
+    container.appendChild(row)
+  })
 }
 
-function renderWeekChart() {
-  const HABITS = getHabits();
-  const container = document.getElementById('week-chart');
-  container.innerHTML = '';
-  const data = getData();
-  const colors = ['#00e5a0','#ff6b6b','#ffd166','#4ecdc4','#a855f7','#fb923c','#38bdf8'];
+async function renderWeekChart(habits) {
+  const container = document.getElementById('week-chart')
+  container.innerHTML = ''
+  const colors = ['#00e5a0','#ff6b6b','#ffd166','#4ecdc4','#a855f7','#fb923c','#38bdf8']
+  const dates = []
   for (let d = 6; d >= 0; d--) {
-    const date = new Date(); date.setDate(date.getDate() - d);
-    const key = getDateKey(date);
-    const dayData = data[key];
-    const done = dayData ? Object.values(dayData.habits || {}).filter(Boolean).length : 0;
-    const pct = HABITS.length ? Math.round((done / HABITS.length) * 100) : 0;
-    const col = document.createElement('div');
-    col.className = 'chart-bar-col';
-    col.innerHTML = `<div class="chart-bar" style="height:${pct}%;background:${colors[6-d]};min-height:${done>0?'4px':'0'}"></div>`;
-    container.appendChild(col);
+    const date = new Date(); date.setDate(date.getDate() - d)
+    dates.push(getDateKey(date))
   }
+  const { data: logs } = await sb.from('habit_logs')
+    .select('habit_id, done, date').in('date', dates).eq('done', true)
+
+  dates.forEach((date, i) => {
+    const done = (logs || []).filter(l => l.date === date).length
+    const pct = habits.length ? Math.round((done / habits.length) * 100) : 0
+    const col = document.createElement('div')
+    col.className = 'chart-bar-col'
+    col.innerHTML = `<div class="chart-bar" style="height:${pct}%;background:${colors[i]};min-height:${done>0?'4px':'0'}"></div>`
+    container.appendChild(col)
+  })
 }
 
 // ─── PAGE HABITUDES ──────────────────────────────────────────────────────────
-function renderHabitsPage() {
-  renderMonthGrid();
-  renderManageHabits();
+async function renderHabitsPage() {
+  await Promise.all([renderMonthGrid(), renderManageHabits()])
 }
 
-function renderManageHabits() {
-  const HABITS = getHabits();
-  const container = document.getElementById('manage-habits-list');
-  container.innerHTML = '';
-  HABITS.forEach((h, i) => {
-    const row = document.createElement('div');
-    row.className = 'habit-row';
-    row.style.marginBottom = '8px';
-    row.style.borderColor = h.color + '60';
+async function renderManageHabits() {
+  const habits = await getHabits()
+  const container = document.getElementById('manage-habits-list')
+  container.innerHTML = ''
+  habits.forEach(h => {
+    const row = document.createElement('div')
+    row.className = 'habit-row'
+    row.style.marginBottom = '8px'
+    row.style.borderColor = h.color + '60'
     row.innerHTML = `
       <div class="habit-left" style="cursor:default">
         <span class="habit-emoji">${h.emoji}</span>
@@ -877,212 +707,206 @@ function renderManageHabits() {
       </div>
       <div style="display:flex;align-items:center;gap:4px">
         <div style="width:10px;height:10px;border-radius:50%;background:${h.color};flex-shrink:0"></div>
-        <button class="habit-delete" onclick="deleteHabit(${i})" title="Supprimer">✕</button>
+        <button class="habit-delete" onclick="deleteHabit('${h.id}')" title="Supprimer">✕</button>
       </div>
-    `;
-    container.appendChild(row);
-  });
+    `
+    container.appendChild(row)
+  })
 }
 
-let selectedColor = PALETTE[0];
+let selectedColor = PALETTE[0]
 
 function buildColorPicker() {
-  const picker = document.getElementById('color-picker');
-  picker.innerHTML = '';
+  const picker = document.getElementById('color-picker')
+  picker.innerHTML = ''
   PALETTE.forEach(color => {
-    const dot = document.createElement('div');
-    dot.className = 'color-opt' + (color === selectedColor ? ' selected' : '');
-    dot.style.background = color;
+    const dot = document.createElement('div')
+    dot.className = 'color-opt' + (color === selectedColor ? ' selected' : '')
+    dot.style.background = color
     dot.onclick = () => {
-      selectedColor = color;
-      document.querySelectorAll('.color-opt').forEach(d => d.classList.remove('selected'));
-      dot.classList.add('selected');
-    };
-    picker.appendChild(dot);
-  });
+      selectedColor = color
+      document.querySelectorAll('.color-opt').forEach(d => d.classList.remove('selected'))
+      dot.classList.add('selected')
+    }
+    picker.appendChild(dot)
+  })
 }
 
 function toggleAddForm() {
-  const form = document.getElementById('add-habit-form');
-  form.classList.toggle('open');
+  const form = document.getElementById('add-habit-form')
+  form.classList.toggle('open')
   if (form.classList.contains('open')) {
-    buildColorPicker();
-    document.getElementById('new-name').focus();
+    buildColorPicker()
+    document.getElementById('new-name').focus()
   } else {
-    document.getElementById('new-emoji').value = '';
-    document.getElementById('new-name').value = '';
+    document.getElementById('new-emoji').value = ''
+    document.getElementById('new-name').value = ''
   }
 }
 
-function addHabit() {
-  const emoji = document.getElementById('new-emoji').value.trim() || '🎯';
-  const name  = document.getElementById('new-name').value.trim();
-  if (!name) { document.getElementById('new-name').focus(); return; }
-
-  const habits = getHabits();
-  const id = 'h_' + Date.now();
-  habits.push({ id, name, emoji, color: selectedColor });
-  saveHabits(habits);
-
-  document.getElementById('new-emoji').value = '';
-  document.getElementById('new-name').value = '';
-  document.getElementById('add-habit-form').classList.remove('open');
-
-  renderHabitsPage();
-  renderDashboard();
-  showToast('✓ Habitude ajoutée');
+async function addHabit() {
+  const emoji = document.getElementById('new-emoji').value.trim() || '🎯'
+  const name  = document.getElementById('new-name').value.trim()
+  if (!name) { document.getElementById('new-name').focus(); return }
+  const habits = await getHabits()
+  const id = 'h_' + Date.now()
+  await sb.from('habits').insert({ id, name, emoji, color: selectedColor, sort_order: habits.length })
+  habitsCache = null
+  document.getElementById('new-emoji').value = ''
+  document.getElementById('new-name').value = ''
+  document.getElementById('add-habit-form').classList.remove('open')
+  await renderHabitsPage()
+  await renderDashboard()
+  showToast('✓ Habitude ajoutée')
 }
 
-function deleteHabit(index) {
-  const habits = getHabits();
-  const h = habits[index];
-  if (!confirm(`Supprimer "${h.name}" ?`)) return;
-  habits.splice(index, 1);
-  saveHabits(habits);
-  renderHabitsPage();
-  renderDashboard();
-  showToast('Habitude supprimée');
+async function deleteHabit(id) {
+  const habits = await getHabits()
+  const h = habits.find(x => x.id === id)
+  if (!confirm(`Supprimer "${h?.name}" ?`)) return
+  await sb.from('habits').delete().eq('id', id)
+  habitsCache = null
+  await renderHabitsPage()
+  await renderDashboard()
+  showToast('Habitude supprimée')
 }
 
-// ─── MONTH GRID ──────────────────────────────────────────────────────────────
-function renderMonthGrid() {
-  const HABITS = getHabits();
-  const container = document.getElementById('month-grid');
-  container.innerHTML = '';
-  const data = getData();
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const today = now.getDate();
+// ─── MONTH GRID ───────────────────────────────────────────────────────────────
+async function renderMonthGrid() {
+  const habits = await getHabits()
+  const container = document.getElementById('month-grid')
+  container.innerHTML = ''
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const today = now.getDate()
+
+  const monthStart = `${year}-${String(month+1).padStart(2,'0')}-01`
+  const monthEnd   = `${year}-${String(month+1).padStart(2,'0')}-${String(daysInMonth).padStart(2,'0')}`
+  const { data: logs } = await sb.from('habit_logs')
+    .select('habit_id, date, done').gte('date', monthStart).lte('date', monthEnd).eq('done', true)
+
+  const logMap = {}
+  ;(logs || []).forEach(l => { logMap[l.habit_id + '_' + l.date] = true })
 
   // Header
-  const empty = document.createElement('div');
-  empty.className = 'month-cell';
-  container.appendChild(empty);
+  const empty = document.createElement('div')
+  empty.className = 'month-cell'
+  container.appendChild(empty)
   for (let d = 1; d <= 31; d++) {
-    const cell = document.createElement('div');
-    cell.className = 'month-cell';
-    cell.style.color = d === today ? 'var(--c1)' : 'var(--muted)';
-    cell.style.fontWeight = d === today ? '700' : '400';
-    cell.textContent = d <= daysInMonth ? d : '';
-    container.appendChild(cell);
+    const cell = document.createElement('div')
+    cell.className = 'month-cell'
+    cell.style.color = d === today ? 'var(--c1)' : 'var(--muted)'
+    cell.style.fontWeight = d === today ? '700' : '400'
+    cell.textContent = d <= daysInMonth ? d : ''
+    container.appendChild(cell)
   }
 
-  HABITS.forEach(h => {
-    const nameCell = document.createElement('div');
-    nameCell.className = 'month-habit-name';
-    nameCell.textContent = h.emoji + ' ' + h.name;
-    container.appendChild(nameCell);
+  habits.forEach(h => {
+    const nameCell = document.createElement('div')
+    nameCell.className = 'month-habit-name'
+    nameCell.textContent = h.emoji + ' ' + h.name
+    container.appendChild(nameCell)
 
     for (let d = 1; d <= 31; d++) {
-      const dot = document.createElement('div');
+      const dot = document.createElement('div')
       if (d > daysInMonth) {
-        dot.className = 'month-dot future';
-        container.appendChild(dot);
-        continue;
+        dot.className = 'month-dot future'
+        container.appendChild(dot)
+        continue
       }
-      const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-      const done = data[dateStr]?.habits?.[h.id];
-      const future = d > today;
-      dot.className = 'month-dot ' + (future ? 'future' : done ? 'done' : 'empty');
-      if (done) dot.style.background = h.color;
+      const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`
+      const done    = logMap[h.id + '_' + dateStr] || false
+      const future  = d > today
+      dot.className = 'month-dot ' + (future ? 'future' : done ? 'done' : 'empty')
+      if (done) dot.style.background = h.color
       if (!future) {
-        dot.onclick = () => {
-          const allData = getData();
-          if (!allData[dateStr]) allData[dateStr] = { habits:{}, steps:null, sleep:null, mood:null };
-          allData[dateStr].habits[h.id] = !allData[dateStr].habits[h.id];
-          saveData(allData);
-          renderMonthGrid();
-          renderDashboard();
-        };
+        dot.onclick = async () => {
+          await sb.from('habit_logs').upsert(
+            { habit_id: h.id, date: dateStr, done: !done },
+            { onConflict: 'habit_id,date' }
+          )
+          await renderMonthGrid()
+          await renderDashboard()
+        }
       }
-      container.appendChild(dot);
+      container.appendChild(dot)
     }
-  });
+  })
 
-  renderStreakCards(data, year, month, today);
+  renderStreakCards(habits, logMap, year, month, today)
 }
 
-function renderStreakCards(data, year, month, today) {
-  const HABITS = getHabits();
-  const container = document.getElementById('streak-cards');
-  container.innerHTML = '';
-  HABITS.forEach(h => {
-    let streak = 0, d = today;
+function renderStreakCards(habits, logMap, year, month, today) {
+  const container = document.getElementById('streak-cards')
+  container.innerHTML = ''
+  habits.forEach(h => {
+    let streak = 0, d = today
     while (d >= 1) {
-      const ds = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-      if (data[ds]?.habits?.[h.id]) { streak++; d--; } else break;
+      const ds = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`
+      if (logMap[h.id + '_' + ds]) { streak++; d-- } else break
     }
-    let monthTotal = 0;
+    let monthTotal = 0
     for (let dd = 1; dd <= today; dd++) {
-      const ds = `${year}-${String(month+1).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;
-      if (data[ds]?.habits?.[h.id]) monthTotal++;
+      const ds = `${year}-${String(month+1).padStart(2,'0')}-${String(dd).padStart(2,'0')}`
+      if (logMap[h.id + '_' + ds]) monthTotal++
     }
-    const card = document.createElement('div');
-    card.className = 'stat-card';
-    card.style.borderTop = `2px solid ${h.color}`;
+    const card = document.createElement('div')
+    card.className = 'stat-card'
+    card.style.borderTop = `2px solid ${h.color}`
     card.innerHTML = `
       <div class="stat-label">${h.emoji} ${h.name}</div>
       <div class="stat-value" style="color:${h.color};font-size:22px">${streak} jours</div>
       <div class="stat-sub">${monthTotal}/${today} ce mois</div>
-    `;
-    container.appendChild(card);
-  });
+    `
+    container.appendChild(card)
+  })
 }
 
 // ─── GYM ─────────────────────────────────────────────────────────────────────
-function renderGym() {
-  loadGymState();
-  const container = document.getElementById('gym-days');
-  container.innerHTML = '';
-  const todayIdx = new Date().getDay();
-  const dayMap = {1:0,2:1,3:2,4:3,5:4,6:5,0:6};
-  const todayGym = dayMap[todayIdx];
+async function renderGym() {
+  await loadGymStateFromDB()
+  const container = document.getElementById('gym-days')
+  container.innerHTML = ''
+  const todayIdx = new Date().getDay()
+  const dayMap   = {1:0,2:1,3:2,4:3,5:4,6:5,0:6}
+  const todayGym = dayMap[todayIdx]
 
   GYM_PROGRAM.forEach((day, di) => {
-    const isToday = di === todayGym;
-    if (!gymState[di]) gymState[di] = {};
+    const isToday = di === todayGym
+    if (!gymState[di]) gymState[di] = {}
 
-    // Calcul progression globale du jour
-    const totalSets = day.exercises.reduce((sum, ex) => sum + ex.sets, 0);
-    const doneSets  = day.exercises.reduce((sum, ex, ei) => sum + (gymState[di][ei]?.sets || 0), 0);
-    const dayPct    = totalSets ? Math.round((doneSets / totalSets) * 100) : 0;
+    const totalSets = day.exercises.reduce((s, ex) => s + ex.sets, 0)
+    const doneSets  = day.exercises.reduce((s, ex, ei) => s + (gymState[di][ei]?.sets || 0), 0)
+    const dayPct    = totalSets ? Math.round((doneSets / totalSets) * 100) : 0
 
-    const el = document.createElement('div');
-    el.className = 'gym-day';
-    if (isToday) el.style.borderColor = day.color;
+    const el = document.createElement('div')
+    el.className = 'gym-day'
+    if (isToday) el.style.borderColor = day.color
 
-    let exercisesHTML = '';
-
+    let exercisesHTML = ''
     if (day.exercises.length === 0) {
-      exercisesHTML = `<div style="color:var(--muted);font-size:13px;padding:12px 0;text-align:center">Repos 🛌</div>`;
+      exercisesHTML = `<div style="color:var(--muted);font-size:13px;padding:12px 0;text-align:center">Repos 🛌</div>`
     } else {
       day.exercises.forEach((ex, ei) => {
-        const state  = gymState[di][ei] || { sets: 0, weight: '' };
-        const done   = state.sets >= ex.sets;
-        const pct    = Math.round((state.sets / ex.sets) * 100);
-        const target = ex.reps > 0 ? `${ex.sets}×${ex.reps}` : `${ex.sets}×max`;
-
-        let bubblesHTML = '';
+        const state  = gymState[di][ei] || { sets: 0, weight: '' }
+        const done   = state.sets >= ex.sets
+        const pct    = Math.round((state.sets / ex.sets) * 100)
+        const target = ex.reps > 0 ? `${ex.sets}×${ex.reps}` : `${ex.sets}×max`
+        let bubblesHTML = ''
         for (let s = 1; s <= ex.sets; s++) {
-          const filled = s <= state.sets;
-          bubblesHTML += `
-            <div class="set-bubble ${filled ? 'done' : ''}"
-              style="${filled ? 'background:'+day.color : ''}"
-              onclick="toggleSet(${di},${ei},${s},${ex.sets},'${day.color}')">
-              ${filled ? '✓' : s}
-            </div>`;
+          const filled = s <= state.sets
+          bubblesHTML += `<div class="set-bubble ${filled ? 'done' : ''}"
+            style="${filled ? 'background:'+day.color : ''}"
+            onclick="toggleSet(${di},${ei},${s},${ex.sets},'${day.color}')">${filled ? '✓' : s}</div>`
         }
-
         exercisesHTML += `
           <div class="exercise-card ${done ? 'completed' : ''}" id="ex-${di}-${ei}">
             <div class="ex-header">
               <div class="ex-name">${ex.name}</div>
               <div class="ex-target" style="color:${day.color}">${target}</div>
-              <div class="ex-completed-badge">
-                <span style="font-size:16px">✓</span> Terminé
-              </div>
+              <div class="ex-completed-badge"><span style="font-size:16px">✓</span> Terminé</div>
             </div>
             <div class="sets-row" id="bubbles-${di}-${ei}">${bubblesHTML}</div>
             <div class="ex-progress-wrap">
@@ -1093,22 +917,21 @@ function renderGym() {
               <div class="ex-progress-label" id="label-${di}-${ei}">${state.sets}/${ex.sets}</div>
             </div>
             <div class="ex-weight-row">
-              <span class="weight-label">Charge :</span>
+              <span class="weight-label" style="font-size:11px;color:var(--muted)">Charge :</span>
               <input class="weight-input" placeholder="kg" type="number" min="0"
                 value="${state.weight || ''}"
-                onchange="saveWeight(${di},${ei},this.value)"
-                onfocus="this.select()">
+                onchange="saveWeight(${di},${ei},this.value)" onfocus="this.select()">
             </div>
-          </div>`;
-      });
+          </div>`
+      })
     }
 
     el.innerHTML = `
-      <div class="gym-day-header" onclick="toggleGymDay(this, ${di})">
+      <div class="gym-day-header" onclick="toggleGymDay(${di})">
         <div class="gym-day-title">
           <div class="gym-day-dot" style="background:${day.color}"></div>
           <div>
-            <div class="gym-day-name">${day.day}${isToday ? ' <span style="color:'+day.color+';font-size:11px;font-family:var(--mono)">← aujourd\'hui</span>' : ''}</div>
+            <div class="gym-day-name">${day.day}${isToday ? ` <span style="color:${day.color};font-size:11px;font-family:var(--mono)">← aujourd'hui</span>` : ''}</div>
             <div class="gym-day-muscle">${day.muscle}</div>
           </div>
         </div>
@@ -1117,100 +940,78 @@ function renderGym() {
           <span style="color:var(--muted);font-size:12px" id="arrow-${di}">${isToday ? '▼' : '▶'}</span>
         </div>
       </div>
-      <div class="gym-day-body ${isToday ? 'open' : ''}" id="body-${di}">
-        ${exercisesHTML}
-      </div>
+      <div class="gym-day-body ${isToday ? 'open' : ''}" id="body-${di}">${exercisesHTML}</div>
       <div class="gym-day-total-bar">
         <div class="gym-day-total-fill" id="daybar-${di}" style="width:${dayPct}%;background:${day.color}"></div>
       </div>
-    `;
-
-    container.appendChild(el);
-  });
+    `
+    container.appendChild(el)
+  })
 }
 
-function toggleGymDay(header, di) {
-  const body  = document.getElementById('body-' + di);
-  const arrow = document.getElementById('arrow-' + di);
-  body.classList.toggle('open');
-  arrow.textContent = body.classList.contains('open') ? '▼' : '▶';
+function toggleGymDay(di) {
+  const body  = document.getElementById('body-'  + di)
+  const arrow = document.getElementById('arrow-' + di)
+  body.classList.toggle('open')
+  arrow.textContent = body.classList.contains('open') ? '▼' : '▶'
 }
 
 function toggleSet(di, ei, setNum, totalSets, color) {
-  if (!gymState[di]) gymState[di] = {};
-  if (!gymState[di][ei]) gymState[di][ei] = { sets: 0, weight: '' };
-
-  const current = gymState[di][ei].sets;
-  // Cliquer sur la bulle N : si déjà fait → repasse à N-1 (undo), sinon → passe à N
-  if (setNum <= current) {
-    gymState[di][ei].sets = setNum - 1;
-  } else {
-    gymState[di][ei].sets = setNum;
-  }
-
-  saveGymState();
-  updateExerciseUI(di, ei, totalSets, color);
-  updateDayBar(di);
+  if (!gymState[di]) gymState[di] = {}
+  if (!gymState[di][ei]) gymState[di][ei] = { sets: 0, weight: '' }
+  const current = gymState[di][ei].sets
+  gymState[di][ei].sets = setNum <= current ? setNum - 1 : setNum
+  updateExerciseUI(di, ei, totalSets, color)
+  updateDayBar(di)
+  saveGymLogDB(di, ei)
 }
 
 function updateExerciseUI(di, ei, totalSets, color) {
-  const state   = gymState[di]?.[ei] || { sets: 0 };
-  const done    = state.sets >= totalSets;
-  const pct     = Math.round((state.sets / totalSets) * 100);
+  const state = gymState[di]?.[ei] || { sets: 0 }
+  const done  = state.sets >= totalSets
+  const pct   = Math.round((state.sets / totalSets) * 100)
 
-  // Bubbles
-  const bubblesEl = document.getElementById(`bubbles-${di}-${ei}`);
+  const bubblesEl = document.getElementById(`bubbles-${di}-${ei}`)
   if (bubblesEl) {
     Array.from(bubblesEl.children).forEach((bubble, idx) => {
-      const s = idx + 1;
-      const filled = s <= state.sets;
-      bubble.className = 'set-bubble ' + (filled ? 'done' : '');
-      bubble.style.background = filled ? color : '';
-      bubble.textContent = filled ? '✓' : s;
-    });
+      const filled = idx + 1 <= state.sets
+      bubble.className = 'set-bubble ' + (filled ? 'done' : '')
+      bubble.style.background = filled ? color : ''
+      bubble.textContent = filled ? '✓' : idx + 1
+    })
   }
-
-  // Fill bar
-  const fillEl = document.getElementById(`fill-${di}-${ei}`);
-  if (fillEl) {
-    fillEl.style.width = pct + '%';
-    fillEl.style.background = done ? '#00e5a0' : color;
-  }
-
-  // Label
-  const labelEl = document.getElementById(`label-${di}-${ei}`);
-  if (labelEl) labelEl.textContent = state.sets + '/' + totalSets;
-
-  // Card state
-  const card = document.getElementById(`ex-${di}-${ei}`);
+  const fillEl = document.getElementById(`fill-${di}-${ei}`)
+  if (fillEl) { fillEl.style.width = pct + '%'; fillEl.style.background = done ? '#00e5a0' : color }
+  const labelEl = document.getElementById(`label-${di}-${ei}`)
+  if (labelEl) labelEl.textContent = state.sets + '/' + totalSets
+  const card = document.getElementById(`ex-${di}-${ei}`)
   if (card) {
-    card.classList.toggle('completed', done);
-    if (done) showToast('🎯 ' + GYM_PROGRAM[di].exercises[ei].name + ' — Terminé !');
+    card.classList.toggle('completed', done)
+    if (done) showToast('🎯 ' + GYM_PROGRAM[di].exercises[ei].name + ' — Terminé !')
   }
 }
 
 function saveWeight(di, ei, val) {
-  if (!gymState[di]) gymState[di] = {};
-  if (!gymState[di][ei]) gymState[di][ei] = { sets: 0, weight: '' };
-  gymState[di][ei].weight = val;
-  saveGymState();
+  if (!gymState[di]) gymState[di] = {}
+  if (!gymState[di][ei]) gymState[di][ei] = { sets: 0, weight: '' }
+  gymState[di][ei].weight = val
+  saveGymLogDB(di, ei)
 }
 
 function updateDayBar(di) {
-  const day = GYM_PROGRAM[di];
-  const totalSets = day.exercises.reduce((s, ex) => s + ex.sets, 0);
-  const doneSets  = day.exercises.reduce((s, ex, ei) => s + (gymState[di][ei]?.sets || 0), 0);
-  const pct = totalSets ? Math.round((doneSets / totalSets) * 100) : 0;
-
-  const bar  = document.getElementById(`daybar-${di}`);
-  const pill = document.getElementById(`pill-${di}`);
-  if (bar)  bar.style.width = pct + '%';
-  if (pill) pill.textContent = pct + '%';
+  const day = GYM_PROGRAM[di]
+  const totalSets = day.exercises.reduce((s, ex) => s + ex.sets, 0)
+  const doneSets  = day.exercises.reduce((s, ex, ei) => s + (gymState[di][ei]?.sets || 0), 0)
+  const pct = totalSets ? Math.round((doneSets / totalSets) * 100) : 0
+  const bar  = document.getElementById(`daybar-${di}`)
+  const pill = document.getElementById(`pill-${di}`)
+  if (bar)  bar.style.width = pct + '%'
+  if (pill) pill.textContent = pct + '%'
 }
 
-// ─── INIT ────────────────────────────────────────────────────────────────────
-updateNavDate();
-renderDashboard();
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+updateNavDate()
+renderDashboard()
 </script>
 </body>
 </html>
