@@ -666,6 +666,7 @@ async function renderDashboard() {
 
   renderWeekBars(habits)
   renderWeekChart(habits)
+  syncObjTabs()
   renderObjectives()
 }
 
@@ -1193,21 +1194,37 @@ function updateDayBar(di) {
 }
 
 // ─── OBJECTIVES ──────────────────────────────────────────────────────────────
+function getRealToday() {
+  const d = new Date(); d.setHours(0,0,0,0); return d
+}
+
 function getObjDate() {
-  const d = new Date(currentDate)
-  if (objViewDay === 'tomorrow') d.setDate(d.getDate() + 1)
-  return getDateKey(d)
+  if (objViewDay === 'tomorrow') {
+    const d = getRealToday(); d.setDate(d.getDate() + 1); return getDateKey(d)
+  }
+  return getDateKey(currentDate)
+}
+
+function isViewingToday() {
+  return getDateKey(currentDate) === getDateKey(getRealToday())
 }
 
 function switchObjDay(day) {
   objViewDay = day
-  const tabToday    = document.getElementById('obj-tab-today')
-  const tabTomorrow = document.getElementById('obj-tab-tomorrow')
-  tabToday.className    = 'obj-day-tab' + (day === 'today'    ? ' active' : '')
-  tabTomorrow.className = 'obj-day-tab' + (day === 'tomorrow' ? ' tomorrow-active' : '')
-  document.getElementById('obj-new-input').placeholder =
-    day === 'tomorrow' ? 'Objectif pour demain...' : 'Ajouter un objectif...'
+  document.getElementById('obj-tab-today').className    = 'obj-day-tab' + (day === 'today'    ? ' active' : '')
+  document.getElementById('obj-tab-tomorrow').className = 'obj-day-tab' + (day === 'tomorrow' ? ' tomorrow-active' : '')
+  document.getElementById('obj-new-input').placeholder  = day === 'tomorrow' ? 'Objectif pour demain...' : 'Ajouter un objectif...'
   renderObjectives()
+}
+
+function syncObjTabs() {
+  // Reset to today + hide Demain tab when browsing past days
+  const onToday = isViewingToday()
+  objViewDay = 'today'
+  document.getElementById('obj-tab-today').className    = 'obj-day-tab active'
+  document.getElementById('obj-tab-tomorrow').className = 'obj-day-tab'
+  document.getElementById('obj-tab-tomorrow').style.display = onToday ? '' : 'none'
+  document.getElementById('obj-new-input').placeholder  = 'Ajouter un objectif...'
 }
 async function getObjectives(date) {
   const { data } = await sb.from('daily_objectives').select('*').eq('date', date).order('sort_order')
