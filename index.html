@@ -311,7 +311,10 @@
 <div class="page active" id="page-dashboard">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;margin-top:0;padding-bottom:8px;border-bottom:1px solid var(--border)">
     <button onclick="navigateDay(-1)" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--muted);padding:6px 14px;cursor:pointer;font-size:13px;transition:all 0.2s" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">← Hier</button>
-    <span id="dash-date-label" style="font-family:var(--mono);font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--muted)">Aujourd'hui</span>
+    <div style="text-align:center;line-height:1.3">
+      <div id="dash-date-label" style="font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text)">Aujourd'hui</div>
+      <div id="dash-date-sub" style="font-family:var(--sans);font-size:11px;color:var(--muted);margin-top:2px"></div>
+    </div>
     <button id="btn-next-day" onclick="navigateDay(1)" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--muted);padding:6px 14px;cursor:pointer;font-size:13px;transition:all 0.2s;visibility:hidden" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">Demain →</button>
   </div>
 
@@ -641,8 +644,12 @@ async function renderDashboard() {
   const months = ['jan','fév','mar','avr','mai','jun','jul','aoû','sep','oct','nov','déc']
   const label = isToday
     ? "Aujourd'hui"
-    : `${days[currentDate.getDay()]} ${currentDate.getDate()} ${months[currentDate.getMonth()]}`
+    : `${days[currentDate.getDay()]}`
+  const sub = isToday
+    ? `${days[currentDate.getDay()]} ${currentDate.getDate()} ${months[currentDate.getMonth()]} ${currentDate.getFullYear()}`
+    : `${currentDate.getDate()} ${months[currentDate.getMonth()]} ${currentDate.getFullYear()}`
   document.getElementById('dash-date-label').textContent = label
+  document.getElementById('dash-date-sub').textContent = sub
 
   // Show/hide next button
   const btnNext = document.getElementById('btn-next-day')
