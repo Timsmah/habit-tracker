@@ -288,6 +288,22 @@
   .obj-new-input::placeholder { color:var(--muted); }
   .obj-new-hint { font-size:11px; color:var(--border); font-family:var(--mono); flex-shrink:0; }
 
+  /* OBJ SECTIONS */
+  .obj-section { border:1px solid var(--border); border-radius:8px; overflow:hidden; margin-bottom:8px; transition:border-color 0.2s; }
+  .obj-section:last-child { margin-bottom:0; }
+  .obj-section-header { display:flex; align-items:center; justify-content:space-between; padding:7px 12px; background:var(--surface2); }
+  .obj-section-title { font-family:var(--mono); font-size:9px; letter-spacing:2px; text-transform:uppercase; font-weight:700; }
+  .obj-section-count { font-family:var(--mono); font-size:10px; color:var(--muted); background:var(--bg); border-radius:10px; padding:1px 7px; }
+  .obj-section-body { padding:0 4px; min-height:20px; transition:background 0.15s; }
+  .obj-section-body.drag-target { background:rgba(0,229,160,0.05); outline:1px dashed rgba(0,229,160,0.3); outline-offset:-2px; }
+  .obj-section-empty { padding:8px 8px; color:var(--border); font-size:12px; }
+  .obj-section .obj-row { padding:8px 8px; }
+  .obj-section .obj-row.drag-over { border-top:2px solid var(--c1); padding-top:6px; }
+
+  /* Priority cycle button */
+  .obj-pri-btn { font-family:var(--mono); font-size:10px; letter-spacing:.5px; padding:3px 9px; border-radius:5px; border:1px solid var(--border); background:transparent; color:var(--muted); cursor:pointer; flex-shrink:0; transition:all 0.2s; white-space:nowrap; }
+  .obj-pri-btn:hover { border-color:var(--muted); color:var(--text); }
+
   /* WARMUP */
   .warmup-section { margin-bottom:14px; padding:8px 12px; background:var(--bg); border-radius:8px; }
   .warmup-title { font-size:9px; text-transform:uppercase; letter-spacing:1.5px; color:var(--muted); font-family:var(--mono); margin-bottom:6px; opacity:0.6; }
@@ -360,7 +376,8 @@
     <div class="obj-new-row">
       <span style="font-size:16px;color:var(--muted)">+</span>
       <input class="obj-new-input" id="obj-new-input" type="text" placeholder="Ajouter un objectif...">
-      <span class="obj-new-hint">↵ Entrée</span>
+      <button class="obj-pri-btn" id="obj-pri-btn" onclick="cycleNewPriority()">Normal</button>
+      <span class="obj-new-hint">↵</span>
     </div>
   </div>
 
@@ -1406,6 +1423,94 @@ async function getObjectives(date) {
 }
 
 let draggedObjId = null
+let newObjPriority = 'normal'
+
+const PRI_CONFIG = {
+  essential: { label: 'Essentiel', color: 'var(--c1)',    next: 'normal'    },
+  normal:    { label: 'Normal',    color: 'var(--muted)', next: 'bonus'     },
+  bonus:     { label: 'Bonus',     color: 'var(--border)',next: 'essential' }
+}
+
+function cycleNewPriority() {
+  newObjPriority = PRI_CONFIG[newObjPriority].next
+  const btn = document.getElementById('obj-pri-btn')
+  btn.textContent = PRI_CONFIG[newObjPriority].label
+  btn.style.color  = PRI_CONFIG[newObjPriority].color
+  btn.style.borderColor = newObjPriority === 'essential' ? 'var(--c1)' : 'var(--border)'
+}
+
+function buildObjRow(obj) {
+  const row = document.createElement('div')
+  row.className = 'obj-row'
+  row.id = 'obj-row-' + obj.id
+  row.dataset.id = obj.id
+  row.dataset.priority = obj.priority || 'normal'
+  row.draggable = true
+  row.innerHTML = `
+    <div class="obj-drag" title="Réordonner">⠿</div>
+    <div class="obj-check ${obj.done ? 'checked' : ''}" onclick="toggleObjective('${obj.id}', ${obj.done})">
+      ${obj.done ? '✓' : ''}
+    </div>
+    <div class="obj-body">
+      <div class="obj-text ${obj.done ? 'done' : ''}" id="objtext-${obj.id}"
+        ondblclick="startEditObj('${obj.id}', this)">${obj.text}</div>
+      <textarea class="obj-note" rows="1"
+        placeholder="Note..."
+        onblur="saveObjNote('${obj.id}', this.value)"
+        oninput="autoResize(this)">${obj.note || ''}</textarea>
+    </div>
+    <div class="obj-actions">
+      <button class="obj-btn" onclick="startEditObj('${obj.id}', document.getElementById('objtext-${obj.id}'))" title="Éditer">✎</button>
+      <button class="obj-btn del" onclick="deleteObjective('${obj.id}')" title="Supprimer">✕</button>
+    </div>
+  `
+
+  row.addEventListener('dragstart', e => {
+    draggedObjId = obj.id
+    row.classList.add('dragging')
+    e.dataTransfer.effectAllowed = 'move'
+  })
+  row.addEventListener('dragend', () => {
+    row.classList.remove('dragging')
+    document.querySelectorAll('.obj-row').forEach(r => r.classList.remove('drag-over'))
+    document.querySelectorAll('.obj-section-body').forEach(b => b.classList.remove('drag-target'))
+  })
+  row.addEventListener('dragover', e => {
+    e.preventDefault()
+    e.stopPropagation()
+    document.querySelectorAll('.obj-row').forEach(r => r.classList.remove('drag-over'))
+    document.querySelectorAll('.obj-section-body').forEach(b => b.classList.remove('drag-target'))
+    if (obj.id !== draggedObjId) row.classList.add('drag-over')
+  })
+  row.addEventListener('drop', async e => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!draggedObjId || draggedObjId === obj.id) return
+    const draggedRow = document.getElementById('obj-row-' + draggedObjId)
+    if (!draggedRow) return
+    const newPri = row.closest('.obj-section-body').dataset.priority
+    row.closest('.obj-section-body').insertBefore(draggedRow, row)
+    draggedRow.dataset.priority = newPri
+    row.classList.remove('drag-over')
+    await saveObjOrder(newPri, draggedObjId)
+    draggedObjId = null
+  })
+
+  return row
+}
+
+async function saveObjOrder(newPriority, movedId) {
+  const updates = []
+  document.querySelectorAll('.obj-section-body').forEach(body => {
+    const pri = body.dataset.priority
+    body.querySelectorAll('.obj-row').forEach((r, i) => {
+      updates.push({ id: r.dataset.id, sort_order: i, priority: pri })
+    })
+  })
+  await Promise.all(updates.map(u =>
+    sb.from('daily_objectives').update({ sort_order: u.sort_order, priority: u.priority }).eq('id', u.id)
+  ))
+}
 
 async function renderObjectives() {
   const date = getObjDate()
@@ -1413,59 +1518,62 @@ async function renderObjectives() {
   const list = document.getElementById('obj-list')
   list.innerHTML = ''
 
-  objectives.forEach(obj => {
-    const row = document.createElement('div')
-    row.className = 'obj-row'
-    row.id = 'obj-row-' + obj.id
-    row.dataset.id = obj.id
-    row.draggable = true
-    row.innerHTML = `
-      <div class="obj-drag" title="Réordonner">⠿</div>
-      <div class="obj-check ${obj.done ? 'checked' : ''}" onclick="toggleObjective('${obj.id}', ${obj.done})">
-        ${obj.done ? '✓' : ''}
-      </div>
-      <div class="obj-body">
-        <div class="obj-text ${obj.done ? 'done' : ''}" id="objtext-${obj.id}"
-          ondblclick="startEditObj('${obj.id}', this)">${obj.text}</div>
-        <textarea class="obj-note" rows="1"
-          placeholder="Note..."
-          onblur="saveObjNote('${obj.id}', this.value)"
-          oninput="autoResize(this)">${obj.note || ''}</textarea>
-      </div>
-      <div class="obj-actions">
-        <button class="obj-btn" onclick="startEditObj('${obj.id}', document.getElementById('objtext-${obj.id}'))" title="Éditer">✎</button>
-        <button class="obj-btn del" onclick="deleteObjective('${obj.id}')" title="Supprimer">✕</button>
-      </div>
-    `
+  const groups = {
+    essential: objectives.filter(o => o.priority === 'essential'),
+    normal:    objectives.filter(o => !o.priority || o.priority === 'normal'),
+    bonus:     objectives.filter(o => o.priority === 'bonus')
+  }
 
-    row.addEventListener('dragstart', e => {
-      draggedObjId = obj.id
-      row.classList.add('dragging')
-      e.dataTransfer.effectAllowed = 'move'
-    })
-    row.addEventListener('dragend', () => {
-      row.classList.remove('dragging')
-      list.querySelectorAll('.obj-row').forEach(r => r.classList.remove('drag-over'))
-    })
-    row.addEventListener('dragover', e => {
+  Object.entries(PRI_CONFIG).forEach(([pri, cfg]) => {
+    const section = document.createElement('div')
+    section.className = 'obj-section'
+
+    const header = document.createElement('div')
+    header.className = 'obj-section-header'
+    header.innerHTML = `
+      <span class="obj-section-title" style="color:${cfg.color}">${cfg.label}</span>
+      <span class="obj-section-count">${groups[pri].length}</span>
+    `
+    section.appendChild(header)
+
+    const body = document.createElement('div')
+    body.className = 'obj-section-body'
+    body.dataset.priority = pri
+
+    if (groups[pri].length === 0) {
+      const empty = document.createElement('div')
+      empty.className = 'obj-section-empty'
+      empty.textContent = 'Aucun objectif'
+      body.appendChild(empty)
+    } else {
+      groups[pri].forEach(obj => body.appendChild(buildObjRow(obj)))
+    }
+
+    // Drop on section body (empty or between rows)
+    body.addEventListener('dragover', e => {
       e.preventDefault()
-      e.dataTransfer.dropEffect = 'move'
-      list.querySelectorAll('.obj-row').forEach(r => r.classList.remove('drag-over'))
-      if (obj.id !== draggedObjId) row.classList.add('drag-over')
+      document.querySelectorAll('.obj-section-body').forEach(b => b.classList.remove('drag-target'))
+      body.classList.add('drag-target')
     })
-    row.addEventListener('drop', async e => {
+    body.addEventListener('dragleave', e => {
+      if (!body.contains(e.relatedTarget)) body.classList.remove('drag-target')
+    })
+    body.addEventListener('drop', async e => {
       e.preventDefault()
-      if (!draggedObjId || draggedObjId === obj.id) return
+      body.classList.remove('drag-target')
+      if (!draggedObjId) return
       const draggedRow = document.getElementById('obj-row-' + draggedObjId)
-      if (!draggedRow) return
-      list.insertBefore(draggedRow, row)
-      row.classList.remove('drag-over')
-      const updates = [...list.querySelectorAll('.obj-row')].map((r, i) => ({ id: r.dataset.id, sort_order: i }))
-      await Promise.all(updates.map(u => sb.from('daily_objectives').update({ sort_order: u.sort_order }).eq('id', u.id)))
+      if (!draggedRow || draggedRow.closest('.obj-section-body') === body) return
+      // Remove empty placeholder if present
+      body.querySelector('.obj-section-empty')?.remove()
+      body.appendChild(draggedRow)
+      draggedRow.dataset.priority = pri
+      await saveObjOrder(pri, draggedObjId)
       draggedObjId = null
     })
 
-    list.appendChild(row)
+    section.appendChild(body)
+    list.appendChild(section)
   })
 
   // Progress
@@ -1492,7 +1600,8 @@ async function addObjective() {
   if (!text) return
   const date = getObjDate()
   const existing = await getObjectives(date)
-  await sb.from('daily_objectives').insert({ date, text, done: false, note: null, sort_order: existing.length })
+  const samePriority = existing.filter(o => (o.priority || 'normal') === newObjPriority)
+  await sb.from('daily_objectives').insert({ date, text, done: false, note: null, sort_order: samePriority.length, priority: newObjPriority })
   input.value = ''
   await renderObjectives()
 }
