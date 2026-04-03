@@ -1492,14 +1492,15 @@ function buildObjRow(obj) {
     row.closest('.obj-section-body').insertBefore(draggedRow, row)
     draggedRow.dataset.priority = newPri
     row.classList.remove('drag-over')
-    await saveObjOrder(newPri, draggedObjId)
     draggedObjId = null
+    await saveObjOrder()
+    await renderObjectives()
   })
 
   return row
 }
 
-async function saveObjOrder(newPriority, movedId) {
+async function saveObjOrder() {
   const updates = []
   document.querySelectorAll('.obj-section-body').forEach(body => {
     const pri = body.dataset.priority
@@ -1507,9 +1508,14 @@ async function saveObjOrder(newPriority, movedId) {
       updates.push({ id: r.dataset.id, sort_order: i, priority: pri })
     })
   })
-  await Promise.all(updates.map(u =>
+  const results = await Promise.all(updates.map(u =>
     sb.from('daily_objectives').update({ sort_order: u.sort_order, priority: u.priority }).eq('id', u.id)
   ))
+  const err = results.find(r => r.error)
+  if (err) {
+    console.error('saveObjOrder error:', err.error)
+    showToast('Erreur sauvegarde — colonne priority manquante ?')
+  }
 }
 
 async function renderObjectives() {
@@ -1564,12 +1570,12 @@ async function renderObjectives() {
       if (!draggedObjId) return
       const draggedRow = document.getElementById('obj-row-' + draggedObjId)
       if (!draggedRow || draggedRow.closest('.obj-section-body') === body) return
-      // Remove empty placeholder if present
       body.querySelector('.obj-section-empty')?.remove()
       body.appendChild(draggedRow)
       draggedRow.dataset.priority = pri
-      await saveObjOrder(pri, draggedObjId)
       draggedObjId = null
+      await saveObjOrder()
+      await renderObjectives()
     })
 
     section.appendChild(body)
