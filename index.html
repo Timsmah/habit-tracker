@@ -257,8 +257,13 @@
   .obj-global-fill { height:100%; border-radius:3px; background:var(--c1); transition:width 0.4s ease; }
   .obj-global-pct { font-family:var(--mono); font-size:11px; color:var(--muted); width:34px; text-align:right; flex-shrink:0; }
 
-  .obj-row { display:flex; align-items:flex-start; gap:10px; padding:10px 0; border-bottom:1px solid var(--border); }
+  .obj-row { display:flex; align-items:flex-start; gap:10px; padding:10px 0; border-bottom:1px solid var(--border); transition:opacity 0.15s; }
   .obj-row:last-child { border-bottom:none; }
+  .obj-row.dragging { opacity:0.35; }
+  .obj-row.drag-over { border-top:2px solid var(--c1); padding-top:8px; }
+  .obj-drag { cursor:grab; color:var(--border); font-size:16px; flex-shrink:0; padding:1px 2px; line-height:1; margin-top:1px; transition:color 0.15s; user-select:none; }
+  .obj-drag:hover { color:var(--muted); }
+  .obj-drag:active { cursor:grabbing; }
   .obj-check { width:20px; height:20px; border-radius:6px; border:2px solid var(--border); flex-shrink:0; cursor:pointer; display:flex; align-items:center; justify-content:center; margin-top:1px; transition:all 0.2s; font-size:12px; }
   .obj-check.checked { background:var(--c1); border-color:var(--c1); color:#000; }
   .obj-body { flex:1; min-width:0; }
@@ -1400,6 +1405,8 @@ async function getObjectives(date) {
   return data || []
 }
 
+let draggedObjId = null
+
 async function renderObjectives() {
   const date = getObjDate()
   const objectives = await getObjectives(date)
@@ -1410,7 +1417,10 @@ async function renderObjectives() {
     const row = document.createElement('div')
     row.className = 'obj-row'
     row.id = 'obj-row-' + obj.id
+    row.dataset.id = obj.id
+    row.draggable = true
     row.innerHTML = `
+      <div class="obj-drag" title="Réordonner">⠿</div>
       <div class="obj-check ${obj.done ? 'checked' : ''}" onclick="toggleObjective('${obj.id}', ${obj.done})">
         ${obj.done ? '✓' : ''}
       </div>
@@ -1427,6 +1437,34 @@ async function renderObjectives() {
         <button class="obj-btn del" onclick="deleteObjective('${obj.id}')" title="Supprimer">✕</button>
       </div>
     `
+
+    row.addEventListener('dragstart', e => {
+      draggedObjId = obj.id
+      row.classList.add('dragging')
+      e.dataTransfer.effectAllowed = 'move'
+    })
+    row.addEventListener('dragend', () => {
+      row.classList.remove('dragging')
+      list.querySelectorAll('.obj-row').forEach(r => r.classList.remove('drag-over'))
+    })
+    row.addEventListener('dragover', e => {
+      e.preventDefault()
+      e.dataTransfer.dropEffect = 'move'
+      list.querySelectorAll('.obj-row').forEach(r => r.classList.remove('drag-over'))
+      if (obj.id !== draggedObjId) row.classList.add('drag-over')
+    })
+    row.addEventListener('drop', async e => {
+      e.preventDefault()
+      if (!draggedObjId || draggedObjId === obj.id) return
+      const draggedRow = document.getElementById('obj-row-' + draggedObjId)
+      if (!draggedRow) return
+      list.insertBefore(draggedRow, row)
+      row.classList.remove('drag-over')
+      const updates = [...list.querySelectorAll('.obj-row')].map((r, i) => ({ id: r.dataset.id, sort_order: i }))
+      await Promise.all(updates.map(u => sb.from('daily_objectives').update({ sort_order: u.sort_order }).eq('id', u.id)))
+      draggedObjId = null
+    })
+
     list.appendChild(row)
   })
 
